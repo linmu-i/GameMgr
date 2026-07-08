@@ -1,0 +1,28 @@
+{
+  "tasks": [
+    {
+      "remote": "https://github.com/linmu-i/EbbGlow.git",
+      "local": "../extern/EbbGlow",
+      "branch": "master",
+      "whitelist": [
+        "EbbGlow/include/",
+        "EbbGlow/source/",
+        "EbbGlow/lib/",
+        "LICENSE.txt",
+        "LICENSE-THIRD-PARTY.txt"
+      ],
+      "blacklist": []
+    },
+    {
+      "remote": "https://github.com/linmu-i/TideEcho.git",
+      "local": "../extern/TideEcho",
+      "branch": "master",
+      "whitelist": [
+        "TideEcho/src",
+        "TideEcho/include",
+        "TideEcho/CMakeLists.txt"
+      ],
+      "blacklist": []
+    }
+  ]
+}
