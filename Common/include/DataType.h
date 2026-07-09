@@ -44,18 +44,18 @@ namespace data
 		Error = 0xff
 	};
 
-	[[nodiscard]] constexpr DataType GetDataType(std::span<const char> pkg) noexcept
+	[[nodiscard]] constexpr DataType GetDataType(std::span<const uint8_t> pkg) noexcept
 	{
 		if (pkg.size() < 4) return DataType::Error;
-		if (static_cast<unsigned char>(pkg[0]) != 0x66 ||
-			static_cast<unsigned char>(pkg[1]) != 0xcc ||
-			static_cast<unsigned char>(pkg[2]) != 0xff) return DataType::Error;
+		if (pkg[0] != 0x66 ||
+			pkg[1] != 0xcc ||
+			pkg[2] != 0xff) return DataType::Error;
 		return static_cast<DataType>(pkg[3]);
 	}
 
-	std::optional<type::Table> TableDataGetTable(std::span<const char> pkg);
+	std::optional<type::Table> TableDataGetTable(std::span<const uint8_t> pkg);
 
-	std::filesystem::path FileRequestGetVDir(std::span<const char> pkg);
+	std::filesystem::path FileRequestGetVDir(std::span<const uint8_t> pkg);
 
 	struct FileInfo
 	{
@@ -65,7 +65,7 @@ namespace data
 		uint32_t maxPackageSize = 0;
 	};
 
-	FileInfo FilePieceRequestGetInfo(std::span<const char> pkg);
+	FileInfo FilePieceRequestGetInfo(std::span<const uint8_t> pkg);
 
 	template<ebbglow::utils::OutStream OS>
 	bool Serialize(OS& os, const FileInfo& info)
@@ -87,15 +87,16 @@ namespace data
 		return true;
 	}
 	
-	bool WriteFileData(const FileInfo& info, std::span<const char> fileData, std::ofstream& f);
-	bool WriteFileData(std::span<const char> pkg, std::ofstream& f);
+	bool WriteFileData(const FileInfo& info, std::span<const uint8_t> fileData, std::ofstream& f);
+	bool WriteFileData(std::span<const uint8_t> pkg, std::ofstream& f);
 
-	std::optional<std::vector<char>> GetFilePiece(const FileInfo& info, std::ifstream& f);
+	std::optional<std::vector<uint8_t>> GetFilePiece(const FileInfo& info, std::ifstream& f);
 
-	std::vector<char> MakeTableRequest();
-	std::vector<char> MakeTableData(const type::Table& table);
-	std::vector<char> MakeFileRequest(const std::filesystem::path& vDir);
-	std::vector<char> MakeFileData(const FileInfo& info, std::ifstream& file);
-	std::vector<char> MakeFilePieceRequest(const FileInfo& info);
+	std::vector<uint8_t> MakeTableRequest();
+	std::vector<uint8_t> MakeTableData(const type::Table& table);
+	std::vector<uint8_t> MakeFileRequest(const std::filesystem::path& vDir);
+	std::vector<uint8_t> MakeFileData(const FileInfo& info, std::ifstream& file);
+	std::vector<uint8_t> MakeFilePieceRequest(const FileInfo& info);
+	std::vector<uint8_t> MakeError();
 
 }

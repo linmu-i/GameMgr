@@ -122,6 +122,7 @@ namespace type
 			return true;
 		}
 		bool write(std::span<const char> data) { return write(data.data(), data.size_bytes()); }
+		bool write(std::span<const uint8_t> data) { return write(reinterpret_cast<const char*>(data.data()), data.size_bytes()); }
 
 		std::vector<char>& data() { return buffer; }
 		const std::vector<char>& data() const { return buffer; }
@@ -139,6 +140,7 @@ namespace type
 	public:
 		MemoryIS() = default;
 		MemoryIS(std::span<const char> buffer) : buffer(buffer), offset(0) {}
+		MemoryIS(std::span<const uint8_t> buffer) : buffer(reinterpret_cast<const char*>(buffer.data()), buffer.size_bytes()), offset(0) {}
 		
 		void reset(std::span<const char> buffer) { this->buffer = buffer; offset = 0; }
 

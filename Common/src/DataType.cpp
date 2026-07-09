@@ -4,7 +4,7 @@
 
 namespace data
 {
-	std::optional<type::Table> TableDataGetTable(std::span<const char> pkg)
+	std::optional<type::Table> TableDataGetTable(std::span<const uint8_t> pkg)
 	{
 		if (GetDataType(pkg) != DataType::TableData) return std::nullopt;
 		type::Table result;
@@ -13,15 +13,15 @@ namespace data
 		return result;
 	}
 
-	bool WriteFileData(const FileInfo& info, std::span<const char> fileData, std::ofstream& f)
+	bool WriteFileData(const FileInfo& info, std::span<const uint8_t> fileData, std::ofstream& f)
 	{
 		if (!f.is_open() || !f.good()) return false;
 		f.seekp(static_cast<std::streamoff>(info.maxPackageSize) * info.index, std::ios::beg);
-		f.write(fileData.data(), fileData.size_bytes());
+		f.write(reinterpret_cast<const char*>(fileData.data()), fileData.size_bytes());
 		return f.good();
 	}
 
-	bool WriteFileData(std::span<const char> pkg, std::ofstream& f)
+	bool WriteFileData(std::span<const uint8_t> pkg, std::ofstream& f)
 	{
 		if (GetDataType(pkg) != DataType::FileData) return false;
 		type::MemoryIS is{ pkg.subspan(4) };
@@ -30,7 +30,7 @@ namespace data
 		return WriteFileData(info, pkg.subspan(static_cast<size_t>(4) + is.position()), f);
 	}
 
-	std::optional<std::vector<char>> GetFilePiece(const FileInfo& info, std::ifstream& f)
+	std::optional<std::vector<uint8_t>> GetFilePiece(const FileInfo& info, std::ifstream& f)
 	{
 		if (!f.is_open() || !f.good()) return std::nullopt;
 		auto tmpPos = f.tellg();
@@ -44,14 +44,14 @@ namespace data
 		if (!f.good()) return std::nullopt;
 
 		uint64_t dataSize = std::min<uint64_t>(fileSize - offset, info.maxPackageSize);
-		std::vector<char> result;
+		std::vector<uint8_t> result;
 		result.resize(dataSize);
-		f.read(result.data(), dataSize);
+		f.read(reinterpret_cast<char*>(result.data()), dataSize);
 		if (f.fail()) return std::nullopt;
 		return result;
 	}
 
-	std::filesystem::path FileRequestGetVDir(std::span<const char> pkg)
+	std::filesystem::path FileRequestGetVDir(std::span<const uint8_t> pkg)
 	{
 		if (GetDataType(pkg) != DataType::FileRequest) return "";
 		std::filesystem::path result;
@@ -60,7 +60,7 @@ namespace data
 		return result;
 	}
 
-	FileInfo FilePieceRequestGetInfo(std::span<const char> pkg)
+	FileInfo FilePieceRequestGetInfo(std::span<const uint8_t> pkg)
 	{
 		if (GetDataType(pkg) != DataType::FilePieceRequest) return {};
 		type::MemoryIS is{ pkg.subspan(4) };
@@ -69,52 +69,52 @@ namespace data
 		return result;
 	}
 
-	std::vector<char> MakeTableRequest()
+	std::vector<uint8_t> MakeTableRequest()
 	{
-		std::vector<char> result;
+		std::vector<uint8_t> result;
 		result.resize(4);
 		result[0] = 0x66;
 		result[1] = 0xcc;
 		result[2] = 0xff;
-		result[3] = static_cast<char>(DataType::TableRequest);
+		result[3] = static_cast<uint8_t>(DataType::TableRequest);
 		return result;
 	}
 
-	std::vector<char> MakeTableData(const type::Table& table)
+	std::vector<uint8_t> MakeTableData(const type::Table& table)
 	{
-		std::vector<char> result;
+		std::vector<uint8_t> result;
 		result.resize(4);
 		result[0] = 0x66;
 		result[1] = 0xcc;
 		result[2] = 0xff;
-		result[3] = static_cast<char>(DataType::TableData);
+		result[3] = static_cast<uint8_t>(DataType::TableData);
 		type::MemoryOS os;
 		if (!type::Serialize(os, table)) return {};
 		result.insert(result.end(), os.activeData().begin(), os.activeData().end());
 		return result;
 	}
 
-	std::vector<char> MakeFileRequest(const std::filesystem::path& vDir)
+	std::vector<uint8_t> MakeFileRequest(const std::filesystem::path& vDir)
 	{
-		std::vector<char> result;
+		std::vector<uint8_t> result;
 		result.resize(4);
 		result[0] = 0x66;
 		result[1] = 0xcc;
 		result[2] = 0xff;
-		result[3] = static_cast<char>(DataType::FileRequest);
+		result[3] = static_cast<uint8_t>(DataType::FileRequest);
 		type::MemoryOS os;
 		ebbglow::utils::Serialize(os, vDir);
 		result.insert(result.end(), os.activeData().begin(), os.activeData().end());
 		return result;
 	}
-	std::vector<char> MakeFileData(const FileInfo& info, std::ifstream& file)
+	std::vector<uint8_t> MakeFileData(const FileInfo& info, std::ifstream& file)
 	{
-		std::vector<char> result;
+		std::vector<uint8_t> result;
 		result.resize(4);
 		result[0] = 0x66;
 		result[1] = 0xcc;
 		result[2] = 0xff;
-		result[3] = static_cast<char>(DataType::FileData);
+		result[3] = static_cast<uint8_t>(DataType::FileData);
 
 		type::MemoryOS os;
 		Serialize(os, info);
@@ -131,17 +131,28 @@ namespace data
 		}
 	}
 
-	std::vector<char> MakeFilePieceRequest(const FileInfo& info)
+	std::vector<uint8_t> MakeFilePieceRequest(const FileInfo& info)
 	{
 		type::MemoryOS os;
 		Serialize(os, info);
-		std::vector<char> result;
+		std::vector<uint8_t> result;
 		result.resize(4);
 		result[0] = 0x66;
 		result[1] = 0xcc;
 		result[2] = 0xff;
-		result[3] = static_cast<char>(DataType::FilePieceRequest);
+		result[3] = static_cast<uint8_t>(DataType::FilePieceRequest);
 		result.insert(result.end(), os.activeData().begin(), os.activeData().end());
+		return result;
+	}
+
+	std::vector<uint8_t> MakeError()
+	{
+		std::vector<uint8_t> result;
+		result.resize(4);
+		result[0] = 0x66;
+		result[1] = 0xcc;
+		result[2] = 0xff;
+		result[3] = static_cast<uint8_t>(DataType::Error);
 		return result;
 	}
 }
