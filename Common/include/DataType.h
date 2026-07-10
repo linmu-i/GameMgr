@@ -17,7 +17,7 @@
 //			对于0x3 FileInfo的数据+柔性文件数据
 //			对于0x4 无柔性数据
 //			对于0x5 FileInfo的数据
-//			对于0xff 无柔性数据，且收到后立即断开本次会话，所有传输内容作废
+//			对于0xff 柔性数据为一个UTF-8字符串，表示原因，收到后立即断开本次会话，所有传输内容作废
 //		注: 
 //			虚拟路径采用对path.generic_u8string()的标准序列化，应为8字节无符号长度+utf-8数据
 //			所有长度标识均视为小端序无符号整数，文件包数/编号/包长也为小端序无符号整数
@@ -97,6 +97,6 @@ namespace data
 	std::vector<uint8_t> MakeFileRequest(const std::filesystem::path& vDir);
 	std::vector<uint8_t> MakeFileData(const FileInfo& info, std::ifstream& file);
 	std::vector<uint8_t> MakeFilePieceRequest(const FileInfo& info);
-	std::vector<uint8_t> MakeError();
+	std::vector<uint8_t> MakeError(const std::u8string& reason);
 
 }

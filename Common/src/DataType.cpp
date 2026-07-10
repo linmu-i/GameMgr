@@ -145,7 +145,7 @@ namespace data
 		return result;
 	}
 
-	std::vector<uint8_t> MakeError()
+	std::vector<uint8_t> MakeError(const std::u8string& reason)
 	{
 		std::vector<uint8_t> result;
 		result.resize(4);
@@ -153,6 +153,9 @@ namespace data
 		result[1] = 0xcc;
 		result[2] = 0xff;
 		result[3] = static_cast<uint8_t>(DataType::Error);
+		type::MemoryOS os;
+		ebbglow::utils::Serialize(os, reason);
+		result.insert(result.end(), os.activeData().begin(), os.activeData().end());
 		return result;
 	}
 }

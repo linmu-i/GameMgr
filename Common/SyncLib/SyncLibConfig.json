@@ -7,7 +7,7 @@
       "whitelist": [
         "EbbGlow/include/",
         "EbbGlow/source/",
-        "EbbGlow/lib/",
+        "EbbGlow/extern/",
         "LICENSE.txt",
         "LICENSE-THIRD-PARTY.txt"
       ],
