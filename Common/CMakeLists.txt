@@ -10,6 +10,7 @@ add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/extern/TideEcho/TideEcho")
 
 target_link_libraries(Common PUBLIC TideEcho)
 target_include_directories(Common PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/extern/EbbGlow/EbbGlow/include")
+target_include_directories(Common PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/extern/EbbGlow/EbbGlow/extern")
 target_include_directories(Common PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
 
 target_sources(Common PRIVATE
