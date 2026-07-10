@@ -96,6 +96,7 @@ namespace data
 	std::vector<uint8_t> MakeTableData(const type::Table& table);
 	std::vector<uint8_t> MakeFileRequest(const std::filesystem::path& vDir);
 	std::vector<uint8_t> MakeFileData(const FileInfo& info, std::ifstream& file);
+	std::vector<uint8_t> MakeFileData(const FileInfo& info, std::span<const uint8_t> filePieceData);
 	std::vector<uint8_t> MakeFilePieceRequest(const FileInfo& info);
 	std::vector<uint8_t> MakeError(const std::u8string& reason);
 

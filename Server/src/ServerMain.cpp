@@ -220,13 +220,13 @@ int main()
 				auto fileData = data::GetFilePiece(sendContext.info, sendContext.fileIfs);
 				if (fileData)
 				{
-					auto result = svr.asyncSend(data::MakeFileData(sendContext.info, sendContext.fileIfs), activeRemote);
+					auto result = svr.asyncSend(data::MakeFileData(sendContext.info, *fileData), activeRemote);
 					sendContext.sendResults.push_back(std::move(result));
 					sendContext.info.index++;
 				}
 				else
 				{
-					svr::PrintLog(svr::LogLevel::Error, "Failed to read file piece. Remote: {}, File: {}", activeRemote.toString(), sendContext.info.vDir.u8string());
+					svr::PrintLog(svr::LogLevel::Error, "Failed to read file piece. Remote: {}, File: {}", activeRemote.toString(), sendContext.info.vDir.string());
 					svr.asyncSend(data::MakeError(u8"Failed to read file piece."), activeRemote);
 					state = ServerState::Error;
 				}
@@ -253,7 +253,7 @@ int main()
 				svr.asyncSend(data::MakeFileRequest(item.first), activeRemote);
 				recvContext.update({ item.first, 0, 0, context.maxPackageSize }, context);
 				state = ServerState::ReceiveFile;
-				svr::PrintLog(svr::LogLevel::Debug, "Request file. Remote: {}, File: {}", activeRemote.toString(), item.first.u8string());
+				svr::PrintLog(svr::LogLevel::Debug, "Request file. Remote: {}, File: {}", activeRemote.toString(), item.first.string());
 			}
 			else
 			{
@@ -272,8 +272,8 @@ int main()
 					if (data::WriteFileData(pkg.data, recvContext.fileOfs))
 					{
 						recvContext.receivedCount++;
-						svr::PrintLog(svr::LogLevel::Debug, "File piece received. Remote: {}, File: {}, Piece: {}/{}", activeRemote.toString(), recvContext.info.vDir.u8string(), recvContext.receivedCount, recvContext.info.packageCount);
-						if (recvContext.receivedCount >= recvContext.info.packageCount)
+						svr::PrintLog(svr::LogLevel::Debug, "File piece received. Remote: {}, File: {}, Piece: {}/{}", activeRemote.toString(), recvContext.info.vDir.string(), recvContext.receivedCount, recvContext.info.packageCount);
+						if (recvContext.receivedCount >= data::FilePieceRequestGetInfo(pkg.data).packageCount)
 						{
 							recvContext.fileOfs.close();
 							std::filesystem::rename(context.tmpDir / recvContext.info.vDir, context.dataDir / recvContext.info.vDir);
@@ -281,26 +281,27 @@ int main()
 							auto game = type::GetGameFromVDir(recvContext.info.vDir);
 							auto filePath = type::GetFilePathFromVDir(recvContext.info.vDir);
 							context.table.directory()[game][filePath] = { requestList.back().second };
-							std::ofstream ofs{ context.tablePath / ".tmp", std::ios::binary};
+							auto tmpTablePath = context.tablePath.parent_path() / (context.tablePath.filename().string() + ".tmp");
+							std::ofstream ofs{ tmpTablePath, std::ios::binary};
 							if (type::Serialize(ofs, context.table))
 							{
-								std::filesystem::rename(context.tablePath / ".tmp", context.tablePath);
+								std::filesystem::rename(tmpTablePath, context.tablePath);
 							}
 							else
 							{
-								svr::PrintLog(svr::LogLevel::Error, "Failed to write table. Remote: {}, File: {}", activeRemote.toString(), recvContext.info.vDir.u8string());
+								svr::PrintLog(svr::LogLevel::Error, "Failed to write table. Remote: {}, File: {}", activeRemote.toString(), recvContext.info.vDir.string());
 								svr.asyncSend(data::MakeError(u8"Failed to write table."), activeRemote);
 								state = ServerState::Error;
 							}
 
 							requestList.pop_back();
 							state = ServerState::RequestFile;
-							svr::PrintLog(svr::LogLevel::Info, "File received. Remote: {}, File: {}", activeRemote.toString(), recvContext.info.vDir.u8string());
+							svr::PrintLog(svr::LogLevel::Info, "File received. Remote: {}, File: {}", activeRemote.toString(), recvContext.info.vDir.string());
 						}
 					}
 					else
 					{
-						svr::PrintLog(svr::LogLevel::Error, "Failed to write file piece. Remote: {}, File: {}", activeRemote.toString(), recvContext.info.vDir.u8string());
+						svr::PrintLog(svr::LogLevel::Error, "Failed to write file piece. Remote: {}, File: {}", activeRemote.toString(), recvContext.info.vDir.string());
 						svr.asyncSend(data::MakeError(u8"Failed to write file piece."), activeRemote);
 						state = ServerState::Error;
 					}

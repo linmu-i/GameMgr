@@ -131,6 +131,21 @@ namespace data
 		}
 	}
 
+	std::vector<uint8_t> MakeFileData(const FileInfo& info, std::span<const uint8_t> filePieceData)
+	{
+		std::vector<uint8_t> result;
+		result.resize(4);
+		result[0] = 0x66;
+		result[1] = 0xcc;
+		result[2] = 0xff;
+		result[3] = static_cast<uint8_t>(DataType::FileData);
+		type::MemoryOS os;
+		Serialize(os, info);
+		result.insert(result.end(), os.activeData().begin(), os.activeData().end());
+		result.insert(result.end(), filePieceData.begin(), filePieceData.end());
+		return result;
+	}
+
 	std::vector<uint8_t> MakeFilePieceRequest(const FileInfo& info)
 	{
 		type::MemoryOS os;
