@@ -23,11 +23,27 @@ namespace svr
 		return context;
 	}
 
+	static LogLevel& GetLogLevelData()
+	{
+		static LogLevel level = LogLevel::Info;
+		return level;
+	}
+
+	LogLevel GetLogLevel()
+	{
+		return GetLogLevelData();
+	}
+
 	void SetLogStream(std::shared_ptr<std::ostream> os)
 	{
 		auto& context = GetLogContext();
 		context.osData = std::move(os);
 		context.os = context.osData.get();
+	}
+
+	void SetLogLevel(LogLevel level)
+	{
+		GetLogLevelData() = level;
 	}
 
 	//不保存os，外部确保生命周期

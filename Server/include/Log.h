@@ -13,10 +13,10 @@ namespace svr
 {
 	enum class LogLevel : uint8_t
 	{
-		Info,
-		Warning,
-		Error,
-		Debug
+		Debug = 0,
+		Info = 1,
+		Warning = 2,
+		Error = 3
 	};
 
 	void SetLogStream(std::shared_ptr<std::ostream> os);
@@ -26,9 +26,13 @@ namespace svr
 
 	std::ostream* GetLogStream();
 
+	void SetLogLevel(LogLevel level);
+	LogLevel GetLogLevel();
+
 	template<typename ...Args>
 	void PrintLog(LogLevel level, const std::string_view logTextFormat, Args ...args)
 	{
+		if (static_cast<uint8_t>(level) < static_cast<uint8_t>(GetLogLevel())) return;
 		std::string lvStr;
 		switch (level)
 		{
@@ -53,13 +57,23 @@ namespace svr
 		auto ms_time = std::chrono::time_point_cast<std::chrono::milliseconds>(time);
 
 		// 转换为东八区（Asia/Shanghai），并格式化为所需字符串
-		timeStr = std::format("[{:%Y-%m-%dT%H:%M:%S%z}]",
-			std::chrono::zoned_time{ "Asia/Shanghai", ms_time });
+		static const auto* tz = std::chrono::locate_zone("Asia/Shanghai");
+		auto zt = std::chrono::zoned_time{ tz, ms_time };
+		std::string fmt = "[{:%Y-%m-%dT%H:%M:%S%z}]";
+		timeStr = std::vformat(fmt, std::make_format_args(zt));
 
 		auto* os = GetLogStream();
 		if (os)
 		{
-			std::string logText = std::vformat(logTextFormat, std::make_format_args(args...));
+			std::string logText;
+			try
+			{
+				logText = std::vformat(logTextFormat, std::make_format_args(args...));
+			}
+			catch (...)
+			{
+				logText = std::string("Log formatting error.") + std::string(logTextFormat);
+			}
 			(*os) << lvStr << ' ' << timeStr << ' ' << logText << std::endl;
 		}
 	}
