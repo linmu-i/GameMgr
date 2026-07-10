@@ -13,6 +13,7 @@ namespace svr
 		std::filesystem::path dataDir;
 		std::filesystem::path tmpDir;
 		uint16_t port = 34184;
+		uint32_t maxPackageSize = 1024 * 128;
 	};
 
 	struct DefaultContext
@@ -67,6 +68,32 @@ namespace svr
 			{
 				auto dataDirStr = cfg["Core"].get("DataDir");
 				result.dataDir = reinterpret_cast<const char8_t*>(dataDirStr.c_str());
+			}
+
+			if (cfg["Core"].has("Port"))
+			{
+				auto portStr = cfg["Core"].get("Port");
+				try
+				{
+					result.port = static_cast<uint16_t>(std::stoul(portStr));
+				}
+				catch (...)
+				{
+					PrintLog(LogLevel::Warning, "Read port failed. Port: {}", portStr);
+				}
+			}
+
+			if (cfg["Core"].has("MaxPackageSize"))
+			{
+				auto maxPackageSizeStr = cfg["Core"].get("MaxPackageSize");
+				try
+				{
+					result.maxPackageSize = static_cast<uint64_t>(std::stoull(maxPackageSizeStr));
+				}
+				catch (...)
+				{
+					PrintLog(LogLevel::Warning, "Read max package size failed. MaxPackageSize: {}", maxPackageSizeStr);
+				}
 			}
 		}
 	}

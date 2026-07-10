@@ -4,12 +4,31 @@
 
 namespace type
 {
-	std::optional<TableItem> Table::file(const std::filesystem::path& vDir) { return this->file(vDir.parent_path(), vDir.filename()); }
-	std::optional<TableItem> Table::file(const std::filesystem::path& game, const std::filesystem::path& filename)
+	std::filesystem::path GetGameFromVDir(const std::filesystem::path& vDir)
+	{
+		if (vDir.empty()) return {};
+		return *vDir.begin();
+	}
+
+	std::filesystem::path GetFilePathFromVDir(const std::filesystem::path& vDir)
+	{
+		if (vDir.empty()) return {};
+		auto it = vDir.begin();
+		++it;
+		std::filesystem::path result;
+		for (; it != vDir.end(); ++it)
+		{
+			result /= *it;
+		}
+		return result;
+	}
+
+	std::optional<TableItem> Table::file(const std::filesystem::path& vDir) { return this->file(GetGameFromVDir(vDir), GetFilePathFromVDir(vDir)); }
+	std::optional<TableItem> Table::file(const std::filesystem::path& game, const std::filesystem::path& filePath)
 	{
 		auto fIt = dat.find(game);
 		if (fIt == dat.end()) return std::nullopt;
-		auto sIt = fIt->second.find(filename);
+		auto sIt = fIt->second.find(filePath);
 		if (sIt == fIt->second.end()) return std::nullopt;
 		return sIt->second;
 	}
@@ -21,9 +40,9 @@ namespace type
 
 		std::vector<std::pair<std::filesystem::path, TableItem>> result;
 		result.reserve(it->second.size());
-		for (auto& [fileName, item] : it->second)
+		for (auto& [filePath, item] : it->second)
 		{
-			result.emplace_back(game / fileName, item);
+			result.emplace_back(game / filePath, item);
 		}
 		return result;
 	}
@@ -39,26 +58,29 @@ namespace type
 
 		for (auto& [game, m] : dat)
 		{
-			for (auto& [fileName, item] : m)
+			for (auto& [filePath, item] : m)
 			{
-				result.emplace_back(game / fileName, item);
+				result.emplace_back(game / filePath, item);
 			}
 		}
 		return result;
 	}
 
-	void Table::insert(const std::filesystem::path& vDir, TableItem item) { this->insert(vDir.parent_path(), vDir.filename(), std::move(item)); }
-	void Table::insert(const std::filesystem::path& game, const std::filesystem::path& filename, TableItem item)
+	void Table::insert(const std::filesystem::path& vDir, TableItem item)
 	{
-		dat[game][filename] = item;
+		this->insert(GetGameFromVDir(vDir), GetFilePathFromVDir(vDir), std::move(item));
+	}
+	void Table::insert(const std::filesystem::path& game, const std::filesystem::path& filePath, TableItem item)
+	{
+		dat[game][filePath] = item;
 	}
 
-	void Table::remove(const std::filesystem::path& vDir) { this->remove(vDir.parent_path(), vDir.filename()); }
-	void Table::remove(const std::filesystem::path& game, const std::filesystem::path& filename)
+	void Table::remove(const std::filesystem::path& vDir) { this->remove(GetGameFromVDir(vDir), GetFilePathFromVDir(vDir)); }
+	void Table::remove(const std::filesystem::path& game, const std::filesystem::path& filePath)
 	{
 		auto fIt = dat.find(game);
 		if (fIt == dat.end()) return;
-		auto sIt = fIt->second.find(filename);
+		auto sIt = fIt->second.find(filePath);
 		if (sIt == fIt->second.end()) return;
 		fIt->second.erase(sIt);
 		if (fIt->second.empty())

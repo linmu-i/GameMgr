@@ -28,6 +28,9 @@ namespace type
 		[[nodiscard]] auto operator<=>(const TableItem& other) const noexcept { return time <=> other.time; }
 	};
 
+	std::filesystem::path GetGameFromVDir(const std::filesystem::path& vDir);
+	std::filesystem::path GetFilePathFromVDir(const std::filesystem::path& vDir);
+
 	class Table
 	{
 	public:
@@ -44,16 +47,16 @@ namespace type
 		int64_t lastForcedPush() const { return lastForcedPushTime; }
 		
 		std::optional<TableItem> file(const std::filesystem::path& vDir);
-		std::optional<TableItem> file(const std::filesystem::path& game, const std::filesystem::path& filename);
+		std::optional<TableItem> file(const std::filesystem::path& game, const std::filesystem::path& filePath);
 
 		std::vector<std::pair<std::filesystem::path, TableItem>> gameFiles(const std::filesystem::path& game);
 		std::vector<std::pair<std::filesystem::path, TableItem>> allFiles();
 
-		void insert(const std::filesystem::path& game, const std::filesystem::path& filename, TableItem item);
+		void insert(const std::filesystem::path& game, const std::filesystem::path& filePath, TableItem item);
 		void insert(const std::filesystem::path& vDir, TableItem item);
 
 		//说明: 关于remove，仅会从本地表项移除，不影响其他端，因此可能出现删除后再次重新拉取的情况，若需要彻底删除，请进行强制推送
-		void remove(const std::filesystem::path& game, const std::filesystem::path& filename);
+		void remove(const std::filesystem::path& game, const std::filesystem::path& filePath);
 		void remove(const std::filesystem::path& vDir);
 
 		void forcedPush();
