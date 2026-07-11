@@ -17,6 +17,7 @@
 //			对于0x3 FileInfo的数据+柔性文件数据
 //			对于0x4 无柔性数据
 //			对于0x5 FileInfo的数据
+//			对于0x6 虚拟路径
 //			对于0xff 柔性数据为一个UTF-8字符串，表示原因，收到后立即断开本次会话，所有传输内容作废
 //		注: 
 //			虚拟路径采用对path.generic_u8string()的标准序列化，应为8字节无符号长度+utf-8数据
@@ -41,6 +42,7 @@ namespace data
 		FileData = 0x3,
 		ACK = 0x4,
 		FilePieceRequest = 0x5,
+		DeleteRequest = 0x6,
 		Error = 0xff
 	};
 
@@ -66,6 +68,10 @@ namespace data
 	};
 
 	FileInfo FilePieceRequestGetInfo(std::span<const uint8_t> pkg);
+	FileInfo FileDataGetInfo(std::span<const uint8_t> pkg);
+	std::filesystem::path DeleteRequestGetVDir(std::span<const uint8_t> pkg);
+
+	std::u8string ErrorGetReason(std::span<const uint8_t> pkg);
 
 	template<ebbglow::utils::OutStream OS>
 	bool Serialize(OS& os, const FileInfo& info)
@@ -98,6 +104,7 @@ namespace data
 	std::vector<uint8_t> MakeFileData(const FileInfo& info, std::ifstream& file);
 	std::vector<uint8_t> MakeFileData(const FileInfo& info, std::span<const uint8_t> filePieceData);
 	std::vector<uint8_t> MakeFilePieceRequest(const FileInfo& info);
+	std::vector<uint8_t> MakeDeleteRequest(const std::filesystem::path& vDir);
 	std::vector<uint8_t> MakeError(const std::u8string& reason);
-
+	std::vector<uint8_t> MakeACK();
 }

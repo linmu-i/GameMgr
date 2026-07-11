@@ -11,9 +11,12 @@ enum class ServerState
 	Idle,
 	SendFile,
 	SentFileWaitACK,
+	SendDelete,
+	SentDeleteWaitACK,
 	RequestFile,
 	ReceiveFile,
 	SendTable,
+	SendTableWaitACK,
 	Error
 };
 
@@ -86,18 +89,18 @@ struct RecvContext
 int main()
 {
 	tideecho::NetServiceGuard guard;
-	svr::SetLogStream(&std::cout);
-	svr::PrintLog(svr::LogLevel::Info, "Program started.");
-	svr::SetLogLevel(svr::LogLevel::Debug);
+	log::SetLogStream(&std::cout);
+	log::PrintLog(log::LogLevel::Info, "Program started.");
+	log::SetLogLevel(log::LogLevel::Debug);
 	svr::Context context = svr::ReadContext("config/config.ini");
 	tideecho::TCPServer svr{ context.port };
 	if (svr.valid())
 	{
-		svr::PrintLog(svr::LogLevel::Info, "Server started. Port: {}", context.port);
+		log::PrintLog(log::LogLevel::Info, "Server started. Port: {}", context.port);
 	}
 	else
 	{
-		svr::PrintLog(svr::LogLevel::Error, "Server start failed. Port: {}", context.port);
+		log::PrintLog(log::LogLevel::Error, "Server start failed. Port: {}", context.port);
 		return -1;
 	}
 
@@ -110,6 +113,8 @@ int main()
 
 	std::vector<svr::DiffItem> requestList;
 	std::vector<svr::DiffItem> sendList;
+	std::vector<std::pair<std::filesystem::path, int64_t>> deleteList;
+	std::vector<std::pair<std::filesystem::path, int64_t>> deleteSendList;
 
 	ServerState state = ServerState::Idle;
 
@@ -122,7 +127,7 @@ int main()
 			auto pkg = svr.getPackage();
 			if (!pkg) break;
 
-			if (data::GetDataType(pkg->data) == data::DataType::TableRequest)
+			if (data::GetDataType(pkg->data) == data::DataType::TableData)
 			{
 				if (state == ServerState::Idle)
 				{
@@ -132,19 +137,60 @@ int main()
 						clientTable = std::move(*tableTmp);
 						activeRemote = pkg->remote;
 
-						svr::GetDiff(requestList, sendList, context.table, clientTable);
+						svr::GetDiff(requestList, sendList, deleteList, deleteSendList, context.table, clientTable);
+
+						for (auto& item : sendList)
+						{
+							auto game = type::GetGameFromVDir(item.first);
+							auto filePath = type::GetFilePathFromVDir(item.first);
+							clientTable.directory()[game][filePath] = item.second;
+						}
+						for (auto& item : deleteSendList)
+						{
+							auto game = type::GetGameFromVDir(item.first);
+							auto filePath = type::GetFilePathFromVDir(item.first);
+							clientTable.directory()[game][filePath] = { item.second, type::FileStatus::Deleted };
+						}
+
+						auto deletedTable = context.table;
+						for (auto& item : deleteList)
+						{
+							auto phyPath = context.dataDir / item.first;
+							if (std::filesystem::exists(phyPath))
+							{
+								std::error_code ec;
+								std::filesystem::remove(phyPath, ec);
+								if (ec)
+								{
+									log::PrintLog(log::LogLevel::Warning, "Failed to delete file. Path: {}, Error: {}", phyPath.string(), ec.message());
+								}
+							}
+							auto game = type::GetGameFromVDir(item.first);
+							auto filePath = type::GetFilePathFromVDir(item.first);
+							deletedTable.directory()[game].erase(filePath);
+						}
+						std::ofstream ofs{ context.tablePath.parent_path() / (context.tablePath.filename().string() + ".tmp"), std::ios::binary};
+						if (!type::Serialize(ofs, deletedTable))
+						{
+							log::PrintLog(log::LogLevel::Error, "Failed to write table to local file. Path: {}", context.tablePath.string());
+							svr.asyncSend(data::MakeError(u8"Failed to write table to local file."), pkg->remote);
+							state = ServerState::Error;
+							break;
+						}
+						std::filesystem::rename(context.tablePath.parent_path() / (context.tablePath.filename().string() + ".tmp"), context.tablePath);
+
 						state = ServerState::SendFile;
-						svr::PrintLog(svr::LogLevel::Info, "Sync started. Remote: {}", pkg->remote.toString());
+						log::PrintLog(log::LogLevel::Info, "Sync started. Remote: {}", pkg->remote.toString());
 					}
 					else
 					{
-						svr::PrintLog(svr::LogLevel::Warning, "Invalid table data. Remote: {}", pkg->remote.toString());
+						log::PrintLog(log::LogLevel::Warning, "Invalid table data. Remote: {}", pkg->remote.toString());
 						svr.asyncSend(data::MakeError(u8"Invalid table data."), pkg->remote);
 					}
 				}
 				else
 				{
-					svr::PrintLog(svr::LogLevel::Warning, "Sync request rejected. Another sync in progress. Remote: {}", pkg->remote.toString());
+					log::PrintLog(log::LogLevel::Warning, "Sync request rejected. Another sync in progress. Remote: {}", pkg->remote.toString());
 					svr.asyncSend(data::MakeError(u8"Another sync in progress."), pkg->remote);
 				}
 			}
@@ -156,7 +202,7 @@ int main()
 				}
 				else
 				{
-					svr::PrintLog(svr::LogLevel::Warning, "Unknown packet. Remote: {}", pkg->remote.toString());
+					log::PrintLog(log::LogLevel::Warning, "Unknown packet. Remote: {}", pkg->remote.toString());
 					svr.asyncSend(data::MakeError(u8"Packet should not be sent."), pkg->remote);
 				}
 			}
@@ -168,7 +214,7 @@ int main()
 			auto remoteStatus = svr.remoteStatus(activeRemote);
 			if (!remoteStatus || *remoteStatus == tideecho::TCPStreamStatus::Error)
 			{
-				svr::PrintLog(svr::LogLevel::Warning, "Remote disconnected. Remote: {}", activeRemote.toString());
+				log::PrintLog(log::LogLevel::Warning, "Remote disconnected. Remote: {}", activeRemote.toString());
 				activeRemote = {};
 				activeQueue.clear();
 				requestList.clear();
@@ -194,8 +240,8 @@ int main()
 				}
 				if (allSent)
 				{
-					state = ServerState::RequestFile;
-					svr::PrintLog(svr::LogLevel::Info, "Sync finished. Remote: {}", activeRemote.toString());
+					state = ServerState::SendDelete;
+					log::PrintLog(log::LogLevel::Info, "Sync finished. Remote: {}", activeRemote.toString());
 				}
 			}
 			else if (!sendContext.sending)
@@ -203,7 +249,7 @@ int main()
 				sendContext.update(sendList.back(), context);
 				sendContext.sending = true;
 			}
-			else if (sendContext.info.index > sendContext.info.packageCount)
+			else if (sendContext.info.index >= sendContext.info.packageCount)
 			{
 				if (sendContext.allSent())
 				{
@@ -212,7 +258,7 @@ int main()
 					sendContext.sendResults.clear();
 					sendContext.sending = false;
 					state = ServerState::SentFileWaitACK;
-					svr::PrintLog(svr::LogLevel::Debug, "File sent. Remote: {}, File: {}", activeRemote.toString(), sendContext.info.vDir.string());
+					log::PrintLog(log::LogLevel::Debug, "File sent. Remote: {}, File: {}", activeRemote.toString(), sendContext.info.vDir.string());
 				}
 			}
 			else
@@ -226,7 +272,7 @@ int main()
 				}
 				else
 				{
-					svr::PrintLog(svr::LogLevel::Error, "Failed to read file piece. Remote: {}, File: {}", activeRemote.toString(), sendContext.info.vDir.string());
+					log::PrintLog(log::LogLevel::Error, "Failed to read file piece. Remote: {}, File: {}", activeRemote.toString(), sendContext.info.vDir.string());
 					svr.asyncSend(data::MakeError(u8"Failed to read file piece."), activeRemote);
 					state = ServerState::Error;
 				}
@@ -240,8 +286,37 @@ int main()
 				activeQueue.pop_front();
 				if (data::GetDataType(pkg.data) == data::DataType::ACK)
 				{
-					svr::PrintLog(svr::LogLevel::Debug, "Get ACK. Remote: {}", activeRemote.toString());
+					log::PrintLog(log::LogLevel::Debug, "Get ACK. Remote: {}", activeRemote.toString());
 					state = ServerState::SendFile;
+				}
+			}
+		}
+		else if (state == ServerState::SendDelete)
+		{
+			if (!deleteSendList.empty())
+			{
+				auto& item = deleteSendList.back();
+				svr.asyncSend(data::MakeDeleteRequest(item.first), activeRemote);
+				state = ServerState::SentDeleteWaitACK;
+				log::PrintLog(log::LogLevel::Debug, "Delete request sent. Remote: {}, File: {}", activeRemote.toString(), item.first.string());
+			}
+			else
+			{
+				state = ServerState::RequestFile;
+				log::PrintLog(log::LogLevel::Debug, "All delete requests sent. Remote: {}", activeRemote.toString());
+			}
+		}
+		else if (state == ServerState::SentDeleteWaitACK)
+		{
+			if (!activeQueue.empty())
+			{
+				auto pkg = std::move(activeQueue.front());
+				activeQueue.pop_front();
+				if (data::GetDataType(pkg.data) == data::DataType::ACK)
+				{
+					log::PrintLog(log::LogLevel::Debug, "Get ACK for delete request. Remote: {}", activeRemote.toString());
+					deleteSendList.pop_back();
+					state = ServerState::SendDelete;
 				}
 			}
 		}
@@ -253,12 +328,12 @@ int main()
 				svr.asyncSend(data::MakeFileRequest(item.first), activeRemote);
 				recvContext.update({ item.first, 0, 0, context.maxPackageSize }, context);
 				state = ServerState::ReceiveFile;
-				svr::PrintLog(svr::LogLevel::Debug, "Request file. Remote: {}, File: {}", activeRemote.toString(), item.first.string());
+				log::PrintLog(log::LogLevel::Debug, "Request file. Remote: {}, File: {}", activeRemote.toString(), item.first.string());
 			}
 			else
 			{
 				state = ServerState::SendTable;
-				svr::PrintLog(svr::LogLevel::Debug, "All files recved. Remote: {}", activeRemote.toString());
+				log::PrintLog(log::LogLevel::Debug, "All files recved. Remote: {}", activeRemote.toString());
 			}
 		}
 		else if (state == ServerState::ReceiveFile)
@@ -272,10 +347,11 @@ int main()
 					if (data::WriteFileData(pkg.data, recvContext.fileOfs))
 					{
 						recvContext.receivedCount++;
-						svr::PrintLog(svr::LogLevel::Debug, "File piece received. Remote: {}, File: {}, Piece: {}/{}", activeRemote.toString(), recvContext.info.vDir.string(), recvContext.receivedCount, recvContext.info.packageCount);
-						if (recvContext.receivedCount >= data::FilePieceRequestGetInfo(pkg.data).packageCount)
+						log::PrintLog(log::LogLevel::Debug, "File piece received. Remote: {}, File: {}, Piece: {}/{}", activeRemote.toString(), recvContext.info.vDir.string(), recvContext.receivedCount, recvContext.info.packageCount);
+						if (recvContext.receivedCount >= data::FileDataGetInfo(pkg.data).packageCount)
 						{
 							recvContext.fileOfs.close();
+							std::filesystem::create_directories(context.dataDir / recvContext.info.vDir.parent_path());
 							std::filesystem::rename(context.tmpDir / recvContext.info.vDir, context.dataDir / recvContext.info.vDir);
 
 							auto game = type::GetGameFromVDir(recvContext.info.vDir);
@@ -289,19 +365,19 @@ int main()
 							}
 							else
 							{
-								svr::PrintLog(svr::LogLevel::Error, "Failed to write table. Remote: {}, File: {}", activeRemote.toString(), recvContext.info.vDir.string());
+								log::PrintLog(log::LogLevel::Error, "Failed to write table. Remote: {}, File: {}", activeRemote.toString(), recvContext.info.vDir.string());
 								svr.asyncSend(data::MakeError(u8"Failed to write table."), activeRemote);
 								state = ServerState::Error;
 							}
 
 							requestList.pop_back();
 							state = ServerState::RequestFile;
-							svr::PrintLog(svr::LogLevel::Info, "File received. Remote: {}, File: {}", activeRemote.toString(), recvContext.info.vDir.string());
+							log::PrintLog(log::LogLevel::Info, "File received. Remote: {}, File: {}", activeRemote.toString(), recvContext.info.vDir.string());
 						}
 					}
 					else
 					{
-						svr::PrintLog(svr::LogLevel::Error, "Failed to write file piece. Remote: {}, File: {}", activeRemote.toString(), recvContext.info.vDir.string());
+						log::PrintLog(log::LogLevel::Error, "Failed to write file piece. Remote: {}, File: {}", activeRemote.toString(), recvContext.info.vDir.string());
 						svr.asyncSend(data::MakeError(u8"Failed to write file piece."), activeRemote);
 						state = ServerState::Error;
 					}
@@ -310,19 +386,39 @@ int main()
 		}
 		else if (state == ServerState::SendTable)
 		{
-			svr.asyncSend(data::MakeTableData(context.table), activeRemote);
-			state = ServerState::Idle;
-			svr::PrintLog(svr::LogLevel::Info, "Table sent. Remote: {}", activeRemote.toString());
+			svr.asyncSend(data::MakeTableData(clientTable), activeRemote);
+			state = ServerState::SendTableWaitACK;
+			log::PrintLog(log::LogLevel::Info, "Table sent. Remote: {}", activeRemote.toString());
+		}
+		else if (state == ServerState::SendTableWaitACK)
+		{
+			if (!activeQueue.empty())
+			{
+				auto pkg = std::move(activeQueue.front());
+				activeQueue.pop_front();
+				if (data::GetDataType(pkg.data) == data::DataType::ACK)
+				{
+					log::PrintLog(log::LogLevel::Info, "Sync succeeded. Remote: {}", activeRemote.toString());
+					svr.asyncSend(data::MakeACK(), activeRemote);
+					activeRemote = {};
+					activeQueue.clear();
+					requestList.clear();
+					sendList.clear();
+					sendContext = SendContext{};
+					state = ServerState::Idle;
+				}
+			}
 		}
 		else if (state == ServerState::Error)
 		{
+			svr.asyncSend(data::MakeError(u8"Sync aborted due to error."), activeRemote);
 			activeRemote = {};
 			activeQueue.clear();
 			requestList.clear();
 			sendList.clear();
 			sendContext = SendContext{};
 			state = ServerState::Idle;
-			svr::PrintLog(svr::LogLevel::Warning, "Sync aborted due to error.");
+			log::PrintLog(log::LogLevel::Warning, "Sync aborted due to error.");
 		}
 
 

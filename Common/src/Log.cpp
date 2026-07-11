@@ -1,7 +1,7 @@
 #include <memory>
 #include <Log.h>
 
-namespace svr
+namespace log
 {
 	struct LogContext
 	{

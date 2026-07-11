@@ -1,7 +1,7 @@
 ﻿# CMakeList.txt: 顶层 CMake 项目文件，在此处执行全局配置
 # 并包含子项目。
 #
-cmake_minimum_required (VERSION 3.8)
+cmake_minimum_required (VERSION 3.12)
 
 # 如果支持，请为 MSVC 编译器启用热重载。
 if (POLICY CMP0141)
@@ -11,8 +11,13 @@ endif()
 
 set(CMAKE_CXX_STANDARD 20)
 
+
+
 project ("GameMgr")
 
 # 包含子项目。
 add_subdirectory ("Common")
 add_subdirectory ("Server")
+
+add_subdirectory ("Common/extern/EbbGlow/EbbGlow")
+add_subdirectory ("Client")

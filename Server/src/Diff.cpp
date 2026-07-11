@@ -5,6 +5,8 @@ namespace svr
 	void GetDiff(
 		std::vector<DiffItem>& requestList,
 		std::vector<DiffItem>& sendList,
+		std::vector<std::pair<std::filesystem::path, int64_t>>& deleteList,
+		std::vector<std::pair<std::filesystem::path, int64_t>>& deleteSendList,
 		type::Table& svrTb, type::Table& cltTb)
 	{
 		auto cltList = cltTb.allFiles();
@@ -23,11 +25,25 @@ namespace svr
 			{
 				if (svrIt->second.time > cltList.front().second.time)
 				{
-					sendList.push_back(*svrIt);
+					if (svrIt->second.status == type::FileStatus::Deleted)
+					{
+						deleteSendList.push_back(std::make_pair(svrIt->first, svrIt->second.time));
+					}
+					else
+					{
+						sendList.push_back(*svrIt);
+					}
 				}
 				else if (svrIt->second.time < cltList.front().second.time)
 				{
-					requestList.push_back(cltList.front());
+					if (cltList.front().second.status == type::FileStatus::Deleted)
+					{
+						deleteList.push_back(std::make_pair(cltList.front().first, cltList.front().second.time));
+					}
+					else
+					{
+						requestList.push_back(cltList.front());
+					}
 				}
 				svrList.erase(svrIt);
 				std::swap(cltList.front(), cltList.back());

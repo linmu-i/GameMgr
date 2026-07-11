@@ -13,9 +13,9 @@ target_compile_options(Server PRIVATE
 
 target_link_libraries(Server PUBLIC Common)
 target_include_directories(Server PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
-target_include_directories(Server PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/../Common/extern/EbbGlow/EbbGlow/extern")
+target_include_directories(Server PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/../Common/extern/")
 
 target_sources(Server PRIVATE
 	"src/ServerMain.cpp"
 	"src/Diff.cpp"
-	"src/Log.cpp")
+	"../Common/src/Log.cpp")

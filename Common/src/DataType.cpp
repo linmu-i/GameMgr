@@ -69,6 +69,24 @@ namespace data
 		return result;
 	}
 
+	FileInfo FileDataGetInfo(std::span<const uint8_t> pkg)
+	{
+		if (GetDataType(pkg) != DataType::FileData) return {};
+		type::MemoryIS is{ pkg.subspan(4) };
+		FileInfo result;
+		if (!Deserialize(is, result)) return {};
+		return result;
+	}
+
+	std::u8string ErrorGetReason(std::span<const uint8_t> pkg)
+	{
+		if (GetDataType(pkg) != DataType::Error) return u8"";
+		std::u8string result;
+		type::MemoryIS is{ pkg.subspan(4) };
+		if (!ebbglow::utils::Deserialize(is, result)) return u8"";
+		return result;
+	}
+
 	std::vector<uint8_t> MakeTableRequest()
 	{
 		std::vector<uint8_t> result;
@@ -160,6 +178,29 @@ namespace data
 		return result;
 	}
 
+	std::vector<uint8_t> MakeDeleteRequest(const std::filesystem::path& vDir)
+	{
+		std::vector<uint8_t> result;
+		result.resize(4);
+		result[0] = 0x66;
+		result[1] = 0xcc;
+		result[2] = 0xff;
+		result[3] = static_cast<uint8_t>(DataType::DeleteRequest);
+		type::MemoryOS os;
+		ebbglow::utils::Serialize(os, vDir);
+		result.insert(result.end(), os.activeData().begin(), os.activeData().end());
+		return result;
+	}
+
+	std::filesystem::path DeleteRequestGetVDir(std::span<const uint8_t> pkg)
+	{
+		if (GetDataType(pkg) != DataType::DeleteRequest) return "";
+		std::filesystem::path result;
+		type::MemoryIS is(pkg.subspan(4));
+		if (!ebbglow::utils::Deserialize(is, result)) return "";
+		return result;
+	}
+
 	std::vector<uint8_t> MakeError(const std::u8string& reason)
 	{
 		std::vector<uint8_t> result;
@@ -171,6 +212,17 @@ namespace data
 		type::MemoryOS os;
 		ebbglow::utils::Serialize(os, reason);
 		result.insert(result.end(), os.activeData().begin(), os.activeData().end());
+		return result;
+	}
+
+	std::vector<uint8_t> MakeACK()
+	{
+		std::vector<uint8_t> result;
+		result.resize(4);
+		result[0] = 0x66;
+		result[1] = 0xcc;
+		result[2] = 0xff;
+		result[3] = static_cast<uint8_t>(DataType::ACK);
 		return result;
 	}
 }
