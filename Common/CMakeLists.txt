@@ -15,4 +15,6 @@ target_include_directories(Common PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
 
 target_sources(Common PRIVATE
 "src/DataType.cpp"
-"src/Type.cpp")
+"src/Type.cpp"
+"src/Log.cpp"
+)

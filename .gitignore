@@ -1,3 +1,5 @@
 .vs/
 out/
 Common/extern/
+Client/working_dir/
+Server/working_dir/

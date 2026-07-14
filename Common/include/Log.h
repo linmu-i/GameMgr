@@ -9,7 +9,7 @@
 #include <string>
 #include <string_view>
 
-namespace log
+namespace mgrLog
 {
 	enum class LogLevel : uint8_t
 	{

@@ -19,4 +19,6 @@ target_sources(Client PRIVATE
     "src/ClientMain.cpp"
     "src/Sync.cpp"
     "src/Config.cpp"
+    "src/Global.cpp"
+    "src/GUI.cpp"
 )

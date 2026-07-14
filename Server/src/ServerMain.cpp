@@ -3,6 +3,7 @@
 #include <TideEcho.h>
 #include <DataType.h>
 #include <Context.h>
+#include <Log.h>
 
 #include <Diff.h>
 
@@ -89,18 +90,18 @@ struct RecvContext
 int main()
 {
 	tideecho::NetServiceGuard guard;
-	log::SetLogStream(&std::cout);
-	log::PrintLog(log::LogLevel::Info, "Program started.");
-	log::SetLogLevel(log::LogLevel::Debug);
+	//mgrLog::SetLogStream(&std::cout);
+	mgrLog::PrintLog(mgrLog::LogLevel::Info, "Program started.");
+	mgrLog::SetLogLevel(mgrLog::LogLevel::Debug);
 	svr::Context context = svr::ReadContext("config/config.ini");
 	tideecho::TCPServer svr{ context.port };
 	if (svr.valid())
 	{
-		log::PrintLog(log::LogLevel::Info, "Server started. Port: {}", context.port);
+		mgrLog::PrintLog(mgrLog::LogLevel::Info, "Server started. Port: {}", context.port);
 	}
 	else
 	{
-		log::PrintLog(log::LogLevel::Error, "Server start failed. Port: {}", context.port);
+		mgrLog::PrintLog(mgrLog::LogLevel::Error, "Server start failed. Port: {}", context.port);
 		return -1;
 	}
 
@@ -162,7 +163,7 @@ int main()
 								std::filesystem::remove(phyPath, ec);
 								if (ec)
 								{
-									log::PrintLog(log::LogLevel::Warning, "Failed to delete file. Path: {}, Error: {}", phyPath.string(), ec.message());
+									mgrLog::PrintLog(mgrLog::LogLevel::Warning, "Failed to delete file. Path: {}, Error: {}", phyPath.string(), ec.message());
 								}
 							}
 							auto game = type::GetGameFromVDir(item.first);
@@ -172,25 +173,26 @@ int main()
 						std::ofstream ofs{ context.tablePath.parent_path() / (context.tablePath.filename().string() + ".tmp"), std::ios::binary};
 						if (!type::Serialize(ofs, deletedTable))
 						{
-							log::PrintLog(log::LogLevel::Error, "Failed to write table to local file. Path: {}", context.tablePath.string());
+							mgrLog::PrintLog(mgrLog::LogLevel::Error, "Failed to write table to local file. Path: {}", context.tablePath.string());
 							svr.asyncSend(data::MakeError(u8"Failed to write table to local file."), pkg->remote);
 							state = ServerState::Error;
 							break;
 						}
+						ofs.close();
 						std::filesystem::rename(context.tablePath.parent_path() / (context.tablePath.filename().string() + ".tmp"), context.tablePath);
 
 						state = ServerState::SendFile;
-						log::PrintLog(log::LogLevel::Info, "Sync started. Remote: {}", pkg->remote.toString());
+						mgrLog::PrintLog(mgrLog::LogLevel::Info, "Sync started. Remote: {}", pkg->remote.toString());
 					}
 					else
 					{
-						log::PrintLog(log::LogLevel::Warning, "Invalid table data. Remote: {}", pkg->remote.toString());
+						mgrLog::PrintLog(mgrLog::LogLevel::Warning, "Invalid table data. Remote: {}", pkg->remote.toString());
 						svr.asyncSend(data::MakeError(u8"Invalid table data."), pkg->remote);
 					}
 				}
 				else
 				{
-					log::PrintLog(log::LogLevel::Warning, "Sync request rejected. Another sync in progress. Remote: {}", pkg->remote.toString());
+					mgrLog::PrintLog(mgrLog::LogLevel::Warning, "Sync request rejected. Another sync in progress. Remote: {}", pkg->remote.toString());
 					svr.asyncSend(data::MakeError(u8"Another sync in progress."), pkg->remote);
 				}
 			}
@@ -202,7 +204,7 @@ int main()
 				}
 				else
 				{
-					log::PrintLog(log::LogLevel::Warning, "Unknown packet. Remote: {}", pkg->remote.toString());
+					mgrLog::PrintLog(mgrLog::LogLevel::Warning, "Unknown packet. Remote: {}", pkg->remote.toString());
 					svr.asyncSend(data::MakeError(u8"Packet should not be sent."), pkg->remote);
 				}
 			}
@@ -214,7 +216,7 @@ int main()
 			auto remoteStatus = svr.remoteStatus(activeRemote);
 			if (!remoteStatus || *remoteStatus == tideecho::TCPStreamStatus::Error)
 			{
-				log::PrintLog(log::LogLevel::Warning, "Remote disconnected. Remote: {}", activeRemote.toString());
+				mgrLog::PrintLog(mgrLog::LogLevel::Warning, "Remote disconnected. Remote: {}", activeRemote.toString());
 				activeRemote = {};
 				activeQueue.clear();
 				requestList.clear();
@@ -241,7 +243,7 @@ int main()
 				if (allSent)
 				{
 					state = ServerState::SendDelete;
-					log::PrintLog(log::LogLevel::Info, "Sync finished. Remote: {}", activeRemote.toString());
+					mgrLog::PrintLog(mgrLog::LogLevel::Info, "Sync finished. Remote: {}", activeRemote.toString());
 				}
 			}
 			else if (!sendContext.sending)
@@ -258,7 +260,7 @@ int main()
 					sendContext.sendResults.clear();
 					sendContext.sending = false;
 					state = ServerState::SentFileWaitACK;
-					log::PrintLog(log::LogLevel::Debug, "File sent. Remote: {}, File: {}", activeRemote.toString(), sendContext.info.vDir.string());
+					mgrLog::PrintLog(mgrLog::LogLevel::Debug, "File sent. Remote: {}, File: {}", activeRemote.toString(), sendContext.info.vDir.string());
 				}
 			}
 			else
@@ -272,7 +274,7 @@ int main()
 				}
 				else
 				{
-					log::PrintLog(log::LogLevel::Error, "Failed to read file piece. Remote: {}, File: {}", activeRemote.toString(), sendContext.info.vDir.string());
+					mgrLog::PrintLog(mgrLog::LogLevel::Error, "Failed to read file piece. Remote: {}, File: {}", activeRemote.toString(), sendContext.info.vDir.string());
 					svr.asyncSend(data::MakeError(u8"Failed to read file piece."), activeRemote);
 					state = ServerState::Error;
 				}
@@ -286,7 +288,7 @@ int main()
 				activeQueue.pop_front();
 				if (data::GetDataType(pkg.data) == data::DataType::ACK)
 				{
-					log::PrintLog(log::LogLevel::Debug, "Get ACK. Remote: {}", activeRemote.toString());
+					mgrLog::PrintLog(mgrLog::LogLevel::Debug, "Get ACK. Remote: {}", activeRemote.toString());
 					state = ServerState::SendFile;
 				}
 			}
@@ -298,12 +300,12 @@ int main()
 				auto& item = deleteSendList.back();
 				svr.asyncSend(data::MakeDeleteRequest(item.first), activeRemote);
 				state = ServerState::SentDeleteWaitACK;
-				log::PrintLog(log::LogLevel::Debug, "Delete request sent. Remote: {}, File: {}", activeRemote.toString(), item.first.string());
+				mgrLog::PrintLog(mgrLog::LogLevel::Debug, "Delete request sent. Remote: {}, File: {}", activeRemote.toString(), item.first.string());
 			}
 			else
 			{
 				state = ServerState::RequestFile;
-				log::PrintLog(log::LogLevel::Debug, "All delete requests sent. Remote: {}", activeRemote.toString());
+				mgrLog::PrintLog(mgrLog::LogLevel::Debug, "All delete requests sent. Remote: {}", activeRemote.toString());
 			}
 		}
 		else if (state == ServerState::SentDeleteWaitACK)
@@ -314,7 +316,7 @@ int main()
 				activeQueue.pop_front();
 				if (data::GetDataType(pkg.data) == data::DataType::ACK)
 				{
-					log::PrintLog(log::LogLevel::Debug, "Get ACK for delete request. Remote: {}", activeRemote.toString());
+					mgrLog::PrintLog(mgrLog::LogLevel::Debug, "Get ACK for delete request. Remote: {}", activeRemote.toString());
 					deleteSendList.pop_back();
 					state = ServerState::SendDelete;
 				}
@@ -326,14 +328,15 @@ int main()
 			{
 				auto& item = requestList.back();
 				svr.asyncSend(data::MakeFileRequest(item.first), activeRemote);
+				std::filesystem::create_directories(context.tmpDir / item.first.parent_path());
 				recvContext.update({ item.first, 0, 0, context.maxPackageSize }, context);
 				state = ServerState::ReceiveFile;
-				log::PrintLog(log::LogLevel::Debug, "Request file. Remote: {}, File: {}", activeRemote.toString(), item.first.string());
+				mgrLog::PrintLog(mgrLog::LogLevel::Debug, "Request file. Remote: {}, File: {}", activeRemote.toString(), item.first.string());
 			}
 			else
 			{
 				state = ServerState::SendTable;
-				log::PrintLog(log::LogLevel::Debug, "All files recved. Remote: {}", activeRemote.toString());
+				mgrLog::PrintLog(mgrLog::LogLevel::Debug, "All files recved. Remote: {}", activeRemote.toString());
 			}
 		}
 		else if (state == ServerState::ReceiveFile)
@@ -347,12 +350,45 @@ int main()
 					if (data::WriteFileData(pkg.data, recvContext.fileOfs))
 					{
 						recvContext.receivedCount++;
-						log::PrintLog(log::LogLevel::Debug, "File piece received. Remote: {}, File: {}, Piece: {}/{}", activeRemote.toString(), recvContext.info.vDir.string(), recvContext.receivedCount, recvContext.info.packageCount);
+						mgrLog::PrintLog(mgrLog::LogLevel::Debug, "File piece received. Remote: {}, File: {}, Piece: {}/{}", activeRemote.toString(), recvContext.info.vDir.string(), recvContext.receivedCount, recvContext.info.packageCount);
 						if (recvContext.receivedCount >= data::FileDataGetInfo(pkg.data).packageCount)
 						{
 							recvContext.fileOfs.close();
 							std::filesystem::create_directories(context.dataDir / recvContext.info.vDir.parent_path());
 							std::filesystem::rename(context.tmpDir / recvContext.info.vDir, context.dataDir / recvContext.info.vDir);
+
+							auto targetPath = context.dataDir / recvContext.info.vDir;
+
+							// 1. 检查文件是否存在（可选，但建议保留）
+							if (std::filesystem::is_regular_file(targetPath))
+							{
+								std::error_code ec;
+
+								// 2. 构造系统时钟时间点（毫秒精度）
+								std::chrono::sys_time<std::chrono::milliseconds> sys_ts{
+									std::chrono::milliseconds(requestList.back().second.time)
+								};
+
+								// 3. 使用 clock_cast 转换为文件系统专用时钟（兼容 MSVC / GCC / Clang）
+								std::filesystem::file_time_type ftime =
+									std::chrono::clock_cast<std::filesystem::file_time_type::clock>(sys_ts);
+
+								// 4. 设置文件的最后写入时间（非抛出版本）
+								std::filesystem::last_write_time(targetPath, ftime, ec);
+
+								if (ec)
+								{
+									mgrLog::PrintLog(mgrLog::LogLevel::Warning,
+										"Failed to set write time for {}, Error: {}",
+										targetPath.string(), ec.message());
+								}
+							}
+							else
+							{
+								mgrLog::PrintLog(mgrLog::LogLevel::Warning,
+									"Physical file does not exist. Path: {}",
+									targetPath.string());
+							}
 
 							auto game = type::GetGameFromVDir(recvContext.info.vDir);
 							auto filePath = type::GetFilePathFromVDir(recvContext.info.vDir);
@@ -361,23 +397,24 @@ int main()
 							std::ofstream ofs{ tmpTablePath, std::ios::binary};
 							if (type::Serialize(ofs, context.table))
 							{
+								ofs.close();
 								std::filesystem::rename(tmpTablePath, context.tablePath);
 							}
 							else
 							{
-								log::PrintLog(log::LogLevel::Error, "Failed to write table. Remote: {}, File: {}", activeRemote.toString(), recvContext.info.vDir.string());
+								mgrLog::PrintLog(mgrLog::LogLevel::Error, "Failed to write table. Remote: {}, File: {}", activeRemote.toString(), recvContext.info.vDir.string());
 								svr.asyncSend(data::MakeError(u8"Failed to write table."), activeRemote);
 								state = ServerState::Error;
 							}
 
 							requestList.pop_back();
 							state = ServerState::RequestFile;
-							log::PrintLog(log::LogLevel::Info, "File received. Remote: {}, File: {}", activeRemote.toString(), recvContext.info.vDir.string());
+							mgrLog::PrintLog(mgrLog::LogLevel::Info, "File received. Remote: {}, File: {}", activeRemote.toString(), recvContext.info.vDir.string());
 						}
 					}
 					else
 					{
-						log::PrintLog(log::LogLevel::Error, "Failed to write file piece. Remote: {}, File: {}", activeRemote.toString(), recvContext.info.vDir.string());
+						mgrLog::PrintLog(mgrLog::LogLevel::Error, "Failed to write file piece. Remote: {}, File: {}", activeRemote.toString(), recvContext.info.vDir.string());
 						svr.asyncSend(data::MakeError(u8"Failed to write file piece."), activeRemote);
 						state = ServerState::Error;
 					}
@@ -388,7 +425,7 @@ int main()
 		{
 			svr.asyncSend(data::MakeTableData(clientTable), activeRemote);
 			state = ServerState::SendTableWaitACK;
-			log::PrintLog(log::LogLevel::Info, "Table sent. Remote: {}", activeRemote.toString());
+			mgrLog::PrintLog(mgrLog::LogLevel::Info, "Table sent. Remote: {}", activeRemote.toString());
 		}
 		else if (state == ServerState::SendTableWaitACK)
 		{
@@ -398,7 +435,7 @@ int main()
 				activeQueue.pop_front();
 				if (data::GetDataType(pkg.data) == data::DataType::ACK)
 				{
-					log::PrintLog(log::LogLevel::Info, "Sync succeeded. Remote: {}", activeRemote.toString());
+					mgrLog::PrintLog(mgrLog::LogLevel::Info, "Sync succeeded. Remote: {}", activeRemote.toString());
 					svr.asyncSend(data::MakeACK(), activeRemote);
 					activeRemote = {};
 					activeQueue.clear();
@@ -418,7 +455,7 @@ int main()
 			sendList.clear();
 			sendContext = SendContext{};
 			state = ServerState::Idle;
-			log::PrintLog(log::LogLevel::Warning, "Sync aborted due to error.");
+			mgrLog::PrintLog(mgrLog::LogLevel::Warning, "Sync aborted due to error.");
 		}
 
 

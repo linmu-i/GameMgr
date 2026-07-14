@@ -13,7 +13,7 @@ namespace core
 	struct SyncContext
 	{
 		std::atomic<bool> isRunning = true;
-		std::unique_ptr<std::mutex> mutex = std::make_unique<std::mutex>();
+		//std::unique_ptr<std::mutex> mutex = std::make_unique<std::mutex>();
 		std::u8string errorMessage;
 
 		type::Table table;

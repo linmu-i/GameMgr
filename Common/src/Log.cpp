@@ -1,7 +1,7 @@
 #include <memory>
 #include <Log.h>
 
-namespace log
+namespace mgrLog
 {
 	struct LogContext
 	{

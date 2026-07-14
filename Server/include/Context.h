@@ -54,7 +54,7 @@ namespace svr
 				}
 				else
 				{
-					PrintLog(LogLevel::Warning, "Read table failed. Path: {}", tbPathStr);
+					mgrLog::PrintLog(mgrLog::LogLevel::Warning, "Read table failed. Path: {}", tbPathStr);
 				}
 			}
 
@@ -79,7 +79,7 @@ namespace svr
 				}
 				catch (...)
 				{
-					PrintLog(LogLevel::Warning, "Read port failed. Port: {}", portStr);
+					mgrLog::PrintLog(mgrLog::LogLevel::Warning, "Read port failed. Port: {}", portStr);
 				}
 			}
 
@@ -92,7 +92,7 @@ namespace svr
 				}
 				catch (...)
 				{
-					PrintLog(LogLevel::Warning, "Read max package size failed. MaxPackageSize: {}", maxPackageSizeStr);
+					mgrLog::PrintLog(mgrLog::LogLevel::Warning, "Read max package size failed. MaxPackageSize: {}", maxPackageSizeStr);
 				}
 			}
 		}

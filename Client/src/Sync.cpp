@@ -53,6 +53,13 @@ namespace core
 	void SyncMain(cfg::Config& config, SyncContext& context, CommandManager& cmdMgr)
 	{
 		tideecho::TCPClient client{ context.serverEndpoint };
+
+		if (!client.valid())
+		{
+			mgrLog::PrintLog(mgrLog::LogLevel::Error, "Client connection error. Server: {}", context.serverEndpoint.toString());
+			context.errorMessage = u8"Client connection error.";
+		}
+
 		SyncState state = SyncState::Idle;
 
 		RecvContext recvContext;
@@ -61,14 +68,16 @@ namespace core
 
 		while (context.isRunning && client.valid())
 		{
-			client.update();
+			
 
 			if (!client.valid())
 			{
-				log::PrintLog(log::LogLevel::Error, "Client connection error. Server: {}", context.serverEndpoint.toString());
+				mgrLog::PrintLog(mgrLog::LogLevel::Error, "Client connection error. Server: {}", context.serverEndpoint.toString());
 				context.errorMessage = u8"Client connection error.";
 				state = SyncState::Error;
 			}
+
+			client.update();
 
 			if (state == SyncState::Idle)
 			{
@@ -106,27 +115,70 @@ namespace core
 					{
 						context.table = std::move(*tableOpt);
 						auto tmpTablePath = config.tablePath.parent_path() / (config.tablePath.filename().string() + ".tmp");
+						std::filesystem::create_directories(tmpTablePath.parent_path());
 						std::ofstream ofs{ tmpTablePath, std::ios::binary };
 						if (!type::Serialize(ofs, context.table))
 						{
-							log::PrintLog(log::LogLevel::Error, "Failed to write table to local file. Server: {}, Path: {}", context.serverEndpoint.toString(), tmpTablePath.string());
+							mgrLog::PrintLog(mgrLog::LogLevel::Error, "Failed to write table to local file. Server: {}, Path: {}", context.serverEndpoint.toString(), tmpTablePath.string());
 							state = SyncState::Error;
 							continue;
 						}
+						ofs.close();
 						std::filesystem::rename(tmpTablePath, config.tablePath);
+						auto allFiles = context.table.allFiles();
+
+						for (const auto& [vDir, item] : allFiles)
+						{
+							auto physicalPathOpt = config.vDirToPhysicalPath(vDir);
+							if (!physicalPathOpt)
+							{
+								mgrLog::PrintLog(mgrLog::LogLevel::Warning, "Failed to map virtual directory to physical path. Server: {}, VDir: {}", context.serverEndpoint.toString(), vDir.string());
+								continue;
+							}
+							auto physicalPath = physicalPathOpt.value();
+
+							if (std::filesystem::is_regular_file(physicalPath))
+							{
+								std::error_code ec;
+
+								// 1. 构造 system_clock 时间点
+								std::chrono::sys_time<std::chrono::milliseconds> sys_ts{
+									std::chrono::milliseconds(item.time)
+								};
+
+								// 2. 使用 clock_cast 通用转换（自动处理 from_sys / from_utc 差异）
+								std::filesystem::file_time_type ftime =
+									std::chrono::clock_cast<std::filesystem::file_time_type::clock>(sys_ts);
+
+								// 3. 设置文件写入时间
+								std::filesystem::last_write_time(physicalPath, ftime, ec);
+
+								if (ec)
+								{
+									mgrLog::PrintLog(mgrLog::LogLevel::Warning,
+										"Failed to set write time for {}. Server: {}, Error: {}",
+										physicalPath.string(), context.serverEndpoint.toString(), ec.message());
+								}
+							}
+							else
+							{
+								mgrLog::PrintLog(mgrLog::LogLevel::Warning, "Physical file does not exist. Server: {}, Path: {}", context.serverEndpoint.toString(), physicalPath.string());
+							}
+						}
+
 						client.asyncSend(data::MakeACK());
-						log::PrintLog(log::LogLevel::Info, "Table received and saved. Server: {}, Path: {}", context.serverEndpoint.toString(), config.tablePath.string());
+						mgrLog::PrintLog(mgrLog::LogLevel::Info, "Table received and saved. Server: {}, Path: {}", context.serverEndpoint.toString(), config.tablePath.string());
 					}
 					else
 					{
-						log::PrintLog(log::LogLevel::Error, "Failed to parse table data from server. Server: {}", context.serverEndpoint.toString());
+						mgrLog::PrintLog(mgrLog::LogLevel::Error, "Failed to parse table data from server. Server: {}", context.serverEndpoint.toString());
 						state = SyncState::Error;
 					}
 				}
 				else if (dataType == data::DataType::Error)
 				{
 					auto reason = data::ErrorGetReason(*pkgOpt);
-					log::PrintLog(log::LogLevel::Error, "Server returned error. Server: {}, Message: {}", context.serverEndpoint.toString(), reason);
+					mgrLog::PrintLog(mgrLog::LogLevel::Error, "Server returned error. Server: {}, Message: {}", context.serverEndpoint.toString(), reinterpret_cast<const char*>(reason.c_str()));
 					context.errorMessage = reason;
 					recvContext.clear();
 					if (cmdResult)
@@ -137,7 +189,7 @@ namespace core
 				}
 				else if (dataType == data::DataType::ACK)
 				{
-					log::PrintLog(log::LogLevel::Info, "Sync succeeded. Server: {}", context.serverEndpoint.toString());
+					mgrLog::PrintLog(mgrLog::LogLevel::Info, "Sync succeeded. Server: {}", context.serverEndpoint.toString());
 					context.errorMessage.clear();
 					if (cmdResult)
 					{
@@ -151,14 +203,14 @@ namespace core
 					auto fileInfo = data::FileDataGetInfo(*pkgOpt);
 					if (fileInfo.vDir.empty())
 					{
-						log::PrintLog(log::LogLevel::Error, "Failed to parse file info from server. Server: {}", context.serverEndpoint.toString());
+						mgrLog::PrintLog(mgrLog::LogLevel::Error, "Failed to parse file info from server. Server: {}", context.serverEndpoint.toString());
 						state = SyncState::Error;
 						continue;
 					}
 
-					if (recvContext.receivedCount>0&& recvContext.info.vDir != fileInfo.vDir)
+					if (recvContext.receivedCount > 0&& recvContext.info.vDir != fileInfo.vDir)
 					{
-						log::PrintLog(log::LogLevel::Error, "Received file piece for unexpected file. Server: {}, Expected: {}, Received: {}", context.serverEndpoint.toString(), recvContext.info.vDir.string(), fileInfo.vDir.string());
+						mgrLog::PrintLog(mgrLog::LogLevel::Error, "Received file piece for unexpected file. Server: {}, Expected: {}, Received: {}", context.serverEndpoint.toString(), recvContext.info.vDir.string(), fileInfo.vDir.string());
 						state = SyncState::Error;
 						continue;
 					}
@@ -168,7 +220,7 @@ namespace core
 
 					if (!physicalPathOpt)
 					{
-						log::PrintLog(log::LogLevel::Error, "Failed to map virtual directory to physical path. Server: {}, VDir: {}", context.serverEndpoint.toString(), fileInfo.vDir.string());
+						mgrLog::PrintLog(mgrLog::LogLevel::Error, "Failed to map virtual directory to physical path. Server: {}, VDir: {}", context.serverEndpoint.toString(), fileInfo.vDir.string());
 						state = SyncState::Error;
 						continue;
 					}
@@ -188,18 +240,18 @@ namespace core
 
 					if (!recvContext.fileOfs.is_open())
 					{
-						log::PrintLog(log::LogLevel::Error, "Failed to open temporary file for writing. Server: {}, Path: {}", context.serverEndpoint.toString(), tmpFilePath.string());
+						mgrLog::PrintLog(mgrLog::LogLevel::Error, "Failed to open temporary file for writing. Server: {}, Path: {}", context.serverEndpoint.toString(), tmpFilePath.string());
 						state = SyncState::Error;
 						continue;
 					}
 
 					if (data::WriteFileData(*pkgOpt, recvContext.fileOfs))
 					{
-						log::PrintLog(log::LogLevel::Debug, "File piece received. Server: {}, File: {}, Piece: {}/{}", context.serverEndpoint.toString(), recvContext.info.vDir.string(), recvContext.receivedCount + 1, recvContext.info.packageCount);
+						mgrLog::PrintLog(mgrLog::LogLevel::Debug, "File piece received. Server: {}, File: {}, Piece: {}/{}", context.serverEndpoint.toString(), recvContext.info.vDir.string(), recvContext.receivedCount + 1, recvContext.info.packageCount);
 					}
 					else
 					{
-						log::PrintLog(log::LogLevel::Error, "Failed to write file piece to temporary file. Server: {}, File: {}", context.serverEndpoint.toString(), recvContext.info.vDir.string());
+						mgrLog::PrintLog(mgrLog::LogLevel::Error, "Failed to write file piece to temporary file. Server: {}, File: {}", context.serverEndpoint.toString(), recvContext.info.vDir.string());
 						state = SyncState::Error;
 						continue;
 					}
@@ -209,7 +261,7 @@ namespace core
 						recvContext.fileOfs.close();
 						auto physicalPath = config.vDirToPhysicalPath(recvContext.info.vDir).value();
 						std::filesystem::rename(physicalPath.parent_path() / (physicalPath.filename().string() + ".tmp"), physicalPath);
-						log::PrintLog(log::LogLevel::Info, "File received. Server: {}, File: {}", context.serverEndpoint.toString(), recvContext.info.vDir.string());
+						mgrLog::PrintLog(mgrLog::LogLevel::Info, "File received. Server: {}, File: {}", context.serverEndpoint.toString(), recvContext.info.vDir.string());
 						client.asyncSend(data::MakeACK());
 						recvContext.clear();
 					}
@@ -220,19 +272,19 @@ namespace core
 					auto physicalPathOpt = config.vDirToPhysicalPath(fileVDir);
 					if (!physicalPathOpt)
 					{
-						log::PrintLog(log::LogLevel::Error, "Failed to map virtual directory to physical path for delete request. Server: {}, FileVDir: {}", context.serverEndpoint.toString(), fileVDir.string());
+						mgrLog::PrintLog(mgrLog::LogLevel::Error, "Failed to map virtual directory to physical path for delete request. Server: {}, FileVDir: {}", context.serverEndpoint.toString(), fileVDir.string());
 						state = SyncState::Error;
 						continue;
 					}
 					try
 					{
 						std::filesystem::remove(physicalPathOpt.value());
-						log::PrintLog(log::LogLevel::Info, "File deleted. Server: {}, FileVDir: {}", context.serverEndpoint.toString(), fileVDir.string());
+						mgrLog::PrintLog(mgrLog::LogLevel::Info, "File deleted. Server: {}, FileVDir: {}", context.serverEndpoint.toString(), fileVDir.string());
 						client.asyncSend(data::MakeACK());
 					}
 					catch (const std::filesystem::filesystem_error& e)
 					{
-						log::PrintLog(log::LogLevel::Error, "Failed to delete file. Server: {}, FileVDir: {}, Error: {}", context.serverEndpoint.toString(), fileVDir.string(), e.what());
+						mgrLog::PrintLog(mgrLog::LogLevel::Error, "Failed to delete file. Server: {}, FileVDir: {}, Error: {}", context.serverEndpoint.toString(), fileVDir.string(), e.what());
 						state = SyncState::Error;
 						continue;
 					}
@@ -243,7 +295,7 @@ namespace core
 					auto physicalPathOpt = config.vDirToPhysicalPath(fileVDir);
 					if (!physicalPathOpt)
 					{
-						log::PrintLog(log::LogLevel::Error, "Failed to map virtual directory to physical path for file request. Server: {}, FileVDir: {}", context.serverEndpoint.toString(), fileVDir.string());
+						mgrLog::PrintLog(mgrLog::LogLevel::Error, "Failed to map virtual directory to physical path for file request. Server: {}, FileVDir: {}", context.serverEndpoint.toString(), fileVDir.string());
 						state = SyncState::Error;
 						continue;
 					}
@@ -255,7 +307,7 @@ namespace core
 					}
 					catch (const std::filesystem::filesystem_error& e)
 					{
-						log::PrintLog(log::LogLevel::Error, "Failed to get file size for file request. Server: {}, FileVDir: {}, Error: {}", context.serverEndpoint.toString(), fileVDir.string(), e.what());
+						mgrLog::PrintLog(mgrLog::LogLevel::Error, "Failed to get file size for file request. Server: {}, FileVDir: {}, Error: {}", context.serverEndpoint.toString(), fileVDir.string(), e.what());
 						state = SyncState::Error;
 						continue;
 					}
@@ -266,7 +318,7 @@ namespace core
 					std::ifstream fileIfs{ physicalPathOpt.value(), std::ios::binary };
 					if (!fileIfs.is_open())
 					{
-						log::PrintLog(log::LogLevel::Error, "Failed to open file for reading in response to file request. Server: {}, FileVDir: {}", context.serverEndpoint.toString(), fileVDir.string());
+						mgrLog::PrintLog(mgrLog::LogLevel::Error, "Failed to open file for reading in response to file request. Server: {}, FileVDir: {}", context.serverEndpoint.toString(), fileVDir.string());
 						state = SyncState::Error;
 						continue;
 					}
@@ -276,11 +328,11 @@ namespace core
 						auto filePiecePkg = data::MakeFileData(fileInfo, fileIfs);
 						client.asyncSend(filePiecePkg);
 					}
-					log::PrintLog(log::LogLevel::Debug, "Server sent file request. Server: {}, FileVDir: {}", context.serverEndpoint.toString(), fileVDir.string());
+					mgrLog::PrintLog(mgrLog::LogLevel::Debug, "Server sent file request. Server: {}, FileVDir: {}", context.serverEndpoint.toString(), fileVDir.string());
 				}
 				else
 				{
-					log::PrintLog(log::LogLevel::Warning, "Received unexpected data type from server. Server: {}, DataType: {}", context.serverEndpoint.toString(), static_cast<uint8_t>(data::GetDataType(*pkgOpt)));
+					mgrLog::PrintLog(mgrLog::LogLevel::Warning, "Received unexpected data type from server. Server: {}, DataType: {}", context.serverEndpoint.toString(), static_cast<int>(data::GetDataType(*pkgOpt)));
 				}
 
 
@@ -291,7 +343,7 @@ namespace core
 				{
 					cmdResult->status->store(CommandStatus::Error);
 				}
-				log::PrintLog(log::LogLevel::Error, "Sync failed. Server: {}", context.serverEndpoint.toString());
+				mgrLog::PrintLog(mgrLog::LogLevel::Error, "Sync failed. Server: {}", context.serverEndpoint.toString());
 				context.isRunning = false;
 				break;
 			}
