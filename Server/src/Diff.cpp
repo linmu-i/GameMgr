@@ -1,4 +1,7 @@
+#include <algorithm>
+
 #include <Diff.h>
+
 
 namespace svr
 {
@@ -42,7 +45,7 @@ namespace svr
 					}
 					else
 					{
-						requestList.push_back(cltList.front());
+						if (cltList.front().second.status != type::FileStatus::Deleted) requestList.push_back(cltList.front());
 					}
 				}
 				svrList.erase(svrIt);
@@ -51,7 +54,7 @@ namespace svr
 			}
 			else
 			{
-				requestList.push_back(cltList.front());
+				if (cltList.front().second.status != type::FileStatus::Deleted) requestList.push_back(cltList.front());
 				std::swap(cltList.front(), cltList.back());
 				cltList.pop_back();
 			}

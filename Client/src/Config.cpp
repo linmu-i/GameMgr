@@ -50,6 +50,20 @@ namespace cfg
 					mgrLog::PrintLog(mgrLog::LogLevel::Warning, "Invalid WinWidth or WinHeight value: {}x{}", winWidthStr, winHeightStr);
 				}
 			}
+			if (cfg["Core"].has("ServerIP") && cfg["Core"].has("ServerPort"))
+			{
+				auto serverIPStr = cfg["Core"].get("ServerIP");
+				auto serverPortStr = cfg["Core"].get("ServerPort");
+				try
+				{
+					uint16_t port = static_cast<uint16_t>(std::stoul(serverPortStr));
+					result.serverEndpoint = tideecho::NetEndpoint{ serverIPStr, port, tideecho::AddressFamily::IPv4 };
+				}
+				catch (...)
+				{
+					mgrLog::PrintLog(mgrLog::LogLevel::Warning, "Invalid ServerIP or ServerPort value: {}:{}", serverIPStr, serverPortStr);
+				}
+			}
 		}
 
 		for (auto& item : cfg)
@@ -111,6 +125,10 @@ namespace cfg
 			auto saveDir = game.second.saveDir;
 			removeSaveDirs.erase(std::remove(removeSaveDirs.begin(), removeSaveDirs.end(), game.first), removeSaveDirs.end());
 			auto gameFiles = table.gameFiles(game.first);
+			
+			{
+				table.directory()[game.first];
+			}
 
 			for (const auto& entry : std::filesystem::recursive_directory_iterator(saveDir))
 			{
@@ -124,15 +142,26 @@ namespace cfg
 					});
 					if (it != gameFiles.end())
 					{
-						if (entry.last_write_time() > std::filesystem::file_time_type::clock::time_point(std::chrono::milliseconds(it->second.time)))
+						auto ft = entry.last_write_time();
+						auto sys_ts = std::chrono::clock_cast<std::chrono::system_clock>(ft);
+						auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+							sys_ts.time_since_epoch()
+						).count();
+						if (ms > it->second.time)
 						{
-							table.directory()[game.first][filePath] = type::TableItem{ std::chrono::duration_cast<std::chrono::milliseconds>(entry.last_write_time().time_since_epoch()).count(), type::FileStatus::Changed };
+							table.directory()[game.first][filePath] = type::TableItem{ ms, type::FileStatus::Changed };
 						}
 						gameFiles.erase(it);
 					}
 					else
 					{
-						table.directory()[game.first][filePath] = type::TableItem{ std::chrono::duration_cast<std::chrono::milliseconds>(entry.last_write_time().time_since_epoch()).count(), type::FileStatus::Created };
+						auto ft = entry.last_write_time();
+						auto sys_ts = std::chrono::clock_cast<std::chrono::system_clock>(ft);
+						auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+							sys_ts.time_since_epoch()
+						).count();
+						table.directory()[game.first][filePath] =
+							type::TableItem{ ms, type::FileStatus::Created };
 					}
 					
 				}

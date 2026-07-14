@@ -46,15 +46,19 @@ namespace gui
 		ebbglow::core::DoubleComs<ebbglow::ui::yui::ControlCom>* controlPool;
 		ebbglow::core::DoubleComs<ebbglow::ui::yui::ViewPortCom>* viewPortPool;
 
+		::core::CommandManager* cmdMgr;
+		::core::SyncContext* syncCtxt;
+
 		float boardInterpolation = 0.0f;
 
 	public:
 		GUIMgr(ebbglow::core::World2D& world, cfg::Config& cfg, ebbglow::core::entity panelId, ebbglow::core::entity scId,
-			ebbglow::core::entity loadingPanelId, ebbglow::core::entity loadingIconId) :
+			ebbglow::core::entity loadingPanelId, ebbglow::core::entity loadingIconId, ::core::CommandManager& cmdMgr,
+			::core::SyncContext& syncCtxt) :
 			
 			world(&world), cfg(&cfg), panelId(panelId), scId(scId), loadingPanelId(loadingPanelId), loadingIconId(loadingIconId),
 			transPool(world.getDoubleBuffer<ebbglow::ui::yui::TransformCom>()), controlPool(world.getDoubleBuffer<ebbglow::ui::yui::ControlCom>()),
-			viewPortPool(world.getDoubleBuffer<ebbglow::ui::yui::ViewPortCom>()) {}
+			viewPortPool(world.getDoubleBuffer<ebbglow::ui::yui::ViewPortCom>()), cmdMgr(&cmdMgr), syncCtxt(&syncCtxt) {}
 		void update() override;
 		void rebuild() { rebuildFlag = true; }
 	};

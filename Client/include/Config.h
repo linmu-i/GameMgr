@@ -23,6 +23,7 @@ namespace cfg
 		GameConfigList gameConfigs;
 		uint32_t maxPackageSize = 1024 * 128;
 		ebbglow::Vec2 winSize{ 800.0f, 600.0f };
+		tideecho::NetEndpoint serverEndpoint{ "127.0.0.1", 34184, tideecho::AddressFamily::IPv4 };
 
 		std::function<std::optional<std::filesystem::path>(const std::filesystem::path&)> vDirToPhysicalPath;
 	};

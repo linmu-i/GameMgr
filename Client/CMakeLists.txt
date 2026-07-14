@@ -21,4 +21,5 @@ target_sources(Client PRIVATE
     "src/Config.cpp"
     "src/Global.cpp"
     "src/GUI.cpp"
+    "src/Win32.cpp"
 )

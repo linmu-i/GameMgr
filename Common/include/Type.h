@@ -7,6 +7,7 @@
 #include <optional>
 #include <span>
 #include <vector>
+#include <cstring>
 
 #include <EbbGlow/Utils/Serialization.h>
 

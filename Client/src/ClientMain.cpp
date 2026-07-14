@@ -4,6 +4,8 @@
 
 #include <Global.h>
 #include <GUI.h>
+#include <Win32.h>
+#include <Log.h>
 
 int main()
 {
@@ -23,10 +25,6 @@ int main()
 	ebbglow::ui::yui::TransformCom scTrans{ { {140, 60}, {0, 0}, 0.0f, 1.0f }, {} };
 	ebbglow::ui::yui::ControlCom scControl{ {0, 0, 1000, 600}, true, true, {} };
 	ebbglow::ui::yui::ViewPortCom scView{ Rect{0, 0, 1000, 600}, {} };
-
-	//scControl.isVisible = false;
-	//scControl.isActive = false;
-	//global::SyncFlag() = true;
 
 	ebbglow::ui::yui::TransformCom panelTrans{ { {0, 0}, {0, 0}, 0.0f, 1.0f }, {} };
 	ebbglow::ui::yui::ControlCom panelControl{ {0, 0, 1000, 600}, true, true, {} };
@@ -70,23 +68,35 @@ int main()
 	ui::yui::TransformCom loadingIconTrans{ { {400, 320}, {40, 40}, 0.0f, 1.0f }, {} };
 	ui::yui::ControlCom loadingIconControl{ {0, 0, 1280, 720}, true, true, {} };
 
+	ui::yui::TransformCom loadingTextTrans{ { {490, 320}, {40, 40}, 0.0f, 1.0f }, {} };
+	ui::yui::ControlCom loadingTextControl{ {0, 0, 1280, 720}, true, true, {} };
+
 	ebbglow::core::entity loadingPanelId = world.getEntityManager()->getId();
 	ebbglow::core::entity loadingIconId = world.getEntityManager()->getId();
+	ebbglow::core::entity loadingTextId = world.getEntityManager()->getId();
+
 
 	ui::yui::TransformAttachTo(loadingIconTrans, loadingPanelTrans, loadingPanelId);
 	ui::yui::ControlAttachTo(loadingIconControl, loadingPanelControl, loadingPanelId);
+	ui::yui::TransformAttachTo(loadingTextTrans, loadingPanelTrans, loadingPanelId);
+	ui::yui::ControlAttachTo(loadingTextControl, loadingPanelControl, loadingPanelId);
 
 	world.createUnit(loadingPanelId, loadingPanelTrans, loadingPanelControl);
 	world.createUnit(loadingIconId, loadingIconTrans, loadingIconControl, ui::yui::ImageBox{rsc::SharedTexture(std::filesystem::path{"img/Loading.png"})}, ui::yui::LayerCom{ &(*world.getUiLayer())[10] });
 
-	gui::GUIMgr guiMgr(world, cfg, panelId, scId, loadingPanelId, loadingIconId);
+	world.createUnit(loadingTextId, loadingTextTrans, loadingTextControl,
+		ui::yui::TextBox
+		{ "同步中...", 48.0f, 4.0f, utils::DynamicLoadFont(global::GetFontData(), "同步中.", 64), 0x263290ff}, ui::yui::LayerCom{&(*world.getUiLayer())[10]}
+	);
+
+	::core::SyncContext syncContext;
+	::core::CommandManager cmdMgr{ syncContext.isRunning };
+
+	gui::GUIMgr guiMgr(world, cfg, panelId, scId, loadingPanelId, loadingIconId, cmdMgr, syncContext);
 	guiMgr.rebuild();
 
 	world.addSystem(std::move(guiMgr));
 
-
-	::core::SyncContext syncContext;
-	::core::CommandManager cmdMgr;
 	syncContext.isRunning = true;
 	syncContext.serverEndpoint = tideecho::NetEndpoint("127.0.0.1", 34184, tideecho::AddressFamily::IPv4);
 
@@ -97,24 +107,42 @@ int main()
 			::core::SyncMain(cfg, syncContext, cmdMgr);
 		});
 
-	syncContext.table = cfg::RebuildTable(cfg);
-	cmdMgr.pushCmd(::core::Command::Sync);
+	win32::SharedWin32Handle win32Handle{ nullptr };
+	std::atomic<bool> isProcessActive{ false };
 
 	while (!WindowShouldClose())
 	{
-		if (world.framesCount / 600 % 2 == 0)
+		if (!global::SyncFlag() && global::StartGameFlag().second && !isProcessActive)
 		{
-			//global::SyncFlag() = true;
+			win32Handle = win32::Win32CreateProcess(global::StartGameFlag().first, "");
+			if (win32Handle.valid())
+			{
+				isProcessActive = true;
+			}
+			else
+			{
+				mgrLog::PrintLog(mgrLog::LogLevel::Error, "Failed to start game process: {}", global::StartGameFlag().first.string());
+			}
+			global::StartGameFlag().second = false;
 		}
-		else
+
+		if (isProcessActive)
 		{
-			//global::SyncFlag() = false;
+			if (!win32::IsProcessActive(win32Handle))
+			{
+				isProcessActive = false;
+				global::SyncFlag() = true;
+				syncContext.table = cfg::RebuildTable(cfg);
+				global::SyncCmd() = cmdMgr.pushCmd(::core::Command::Sync);
+			}
 		}
+
+		cmdMgr.update();
 		world.update();
-		BeginDrawing();
+		ebbglow::BeginDrawing();
 		gfx::ClearBackground(0x00000000);
 		world.draw();
-		EndDrawing();
+		ebbglow::EndDrawing();
 	}
 	syncContext.isRunning = false;
 }

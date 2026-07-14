@@ -1,3 +1,26 @@
+//	状态				触发条件/事件							动作													下一个状态
+//	Idle				收到客户端 TableData					解析表，计算差异（sendList/deleteList/requestList），	SendFile
+//																删除本地多余文件，更新本地表（写入磁盘）
+//	SendFile			sendList 为空且所有已发送文件确认完成	（无动作，直接跳转）									SendDelete
+//	SendFile			当前文件所有分片已发送且确认完成		关闭文件，清除发送上下文，等待ACK						SentFileWaitACK
+//	SendFile			当前文件未发送完成						读取文件分片，异步发送 FileData，更新索引				SendFile（继续）
+//	SentFileWaitACK		收到 ACK（来自客户端）					确认收到，继续发送下一个文件或文件分片					SendFile
+//	SendDelete			deleteSendList 非空						发送 DeleteRequest（文件删除请求）						SentDeleteWaitACK
+//	SentDeleteWaitACK	收到 ACK（来自客户端）					确认删除，从列表中移除该项，继续下一个删除				SendDelete
+//	SendDelete			deleteSendList 为空						（无动作）												RequestFile
+//	RequestFile			requestList 非空						创建接收上下文，发送 FileRequest 请求文件				ReceiveFile
+//	ReceiveFile			收到 FileData 分片						写入临时文件，累计 receivedCount；						ReceiveFile（继续接收）
+//																若 receivedCount >= packageCount，则关闭文件，
+//																移动到 dataDir，更新时间戳，更新本地表并写入磁盘，
+//																从 requestList 移除该项
+//	ReceiveFile			文件接收完成（上述动作后）				（无动作）												RequestFile（下一个文件）
+//	RequestFile			requestList 为空						（无动作）												SendTable
+//	SendTable			（自动）								发送 clientTable（更新后的客户端表）					SendTableWaitACK
+//	SendTableWaitACK	收到 ACK（来自客户端）					发送 ACK 回客户端，清理所有会话状态						Idle
+//	Error				（任何错误）							发送错误消息，清理会话，回到空闲						Idle
+//	任意状态			远程客户端断开连接						清理会话，回到空闲										Idle
+
+
 #include <bitset>
 
 #include <TideEcho.h>
@@ -46,7 +69,8 @@ struct SendContext
 	{
 		info.vDir = item.first;
 		info.index = 0;
-		info.packageCount = static_cast<uint16_t>((item.second.time + context.maxPackageSize - 1) / context.maxPackageSize);
+		auto fileSize = std::filesystem::file_size(context.dataDir / info.vDir);
+		info.packageCount = static_cast<uint16_t>((fileSize + context.maxPackageSize - 1) / context.maxPackageSize);
 		info.maxPackageSize = context.maxPackageSize;
 		fileIfs.close();
 		fileIfs.clear();
@@ -119,6 +143,18 @@ int main()
 
 	ServerState state = ServerState::Idle;
 
+	{
+		std::ifstream tableIfs{ context.tablePath };
+		if (!tableIfs.is_open())
+		{
+			mgrLog::PrintLog(mgrLog::LogLevel::Warning, "Failed to open native table.");
+		}
+		else if (!type::Deserialize(tableIfs, context.table))
+		{
+			mgrLog::PrintLog(mgrLog::LogLevel::Warning, "Failed to deserilize native table.");
+		}
+	}
+
 	while (svr.valid())
 	{
 		svr.update();
@@ -165,6 +201,7 @@ int main()
 								{
 									mgrLog::PrintLog(mgrLog::LogLevel::Warning, "Failed to delete file. Path: {}, Error: {}", phyPath.string(), ec.message());
 								}
+								
 							}
 							auto game = type::GetGameFromVDir(item.first);
 							auto filePath = type::GetFilePathFromVDir(item.first);
@@ -180,7 +217,7 @@ int main()
 						}
 						ofs.close();
 						std::filesystem::rename(context.tablePath.parent_path() / (context.tablePath.filename().string() + ".tmp"), context.tablePath);
-
+						context.table = std::move(deletedTable);
 						state = ServerState::SendFile;
 						mgrLog::PrintLog(mgrLog::LogLevel::Info, "Sync started. Remote: {}", pkg->remote.toString());
 					}

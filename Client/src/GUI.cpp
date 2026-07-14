@@ -113,7 +113,11 @@ namespace gui
 			if (msgList->empty()) continue;
 			
 			global::SyncFlag() = true;
-			global::StartGameFlag() = { gameExes[i], true};
+			global::StartGameFlag() = { gameExes[i], true };
+			syncCtxt->table = cfg::RebuildTable(*cfg);
+			auto cmdRs = cmdMgr->pushCmd(::core::Command::Sync);
+			global::SyncCmd() = std::move(cmdRs);
+			int l = 1;
 		}
 
 		auto& inaPanelControl = *controlPool->inactive()->get(panelId);
@@ -137,6 +141,12 @@ namespace gui
 			boardInterpolation -= ebbglow::utils::GetFrameTime() * 10.0f;
 			boardInterpolation = std::clamp(boardInterpolation, 0.0f, 0.6f);
 		}
+
+		if (global::SyncFlag() && (global::SyncCmd().success() || global::SyncCmd().error()))
+		{
+			global::SyncFlag() = false;
+		}
+
 		(*world->getUiLayer())[7].push_back(std::make_unique<BoardDraw>(boardInterpolation));
 	}
 }

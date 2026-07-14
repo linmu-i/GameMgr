@@ -16,12 +16,27 @@ namespace core
 
 	CommandResult CommandManager::pushCmd(Command cmd)
 	{
+		if (!isRunning)
+		{
+			return { std::make_shared<std::atomic<CommandStatus>>(CommandStatus::Error) };
+		}
 		CommandResult result = { std::make_shared<std::atomic<CommandStatus>>(CommandStatus::Waiting) };
 		{
 			std::lock_guard lock{ *mutex };
 			commandQueue.emplace_back(cmd, result);
 		}
 		return result;
+	}
+
+	void CommandManager::update()
+	{
+		if (!isRunning)
+		{
+			for (auto& status : commandQueue)
+			{
+				if (!status.second.success()) status.second.status->store(CommandStatus::Error);
+			}
+		}
 	}
 
 	enum class SyncState
@@ -54,7 +69,7 @@ namespace core
 	{
 		tideecho::TCPClient client{ context.serverEndpoint };
 
-		if (!client.valid())
+		if (!client.valid() || client.status() == tideecho::TCPStreamStatus::Idle)
 		{
 			mgrLog::PrintLog(mgrLog::LogLevel::Error, "Client connection error. Server: {}", context.serverEndpoint.toString());
 			context.errorMessage = u8"Client connection error.";
@@ -70,7 +85,7 @@ namespace core
 		{
 			
 
-			if (!client.valid())
+			if (!client.valid() || client.status() == tideecho::TCPStreamStatus::Idle)
 			{
 				mgrLog::PrintLog(mgrLog::LogLevel::Error, "Client connection error. Server: {}", context.serverEndpoint.toString());
 				context.errorMessage = u8"Client connection error.";
@@ -235,7 +250,7 @@ namespace core
 					}
 					else
 					{
-						recvContext.fileOfs.open(tmpFilePath, std::ios::binary | std::ios::app);
+						//recvContext.fileOfs.open(tmpFilePath, std::ios::binary | std::ios::app);
 					}
 
 					if (!recvContext.fileOfs.is_open())
@@ -251,7 +266,7 @@ namespace core
 					}
 					else
 					{
-						mgrLog::PrintLog(mgrLog::LogLevel::Error, "Failed to write file piece to temporary file. Server: {}, File: {}", context.serverEndpoint.toString(), recvContext.info.vDir.string());
+						mgrLog::PrintLog(mgrLog::LogLevel::Error, "Failed to write file piece to temporary file. Server: {}, File: {} Piece: {}/{}", context.serverEndpoint.toString(), recvContext.info.vDir.string(), recvContext.receivedCount + 1, recvContext.info.packageCount);
 						state = SyncState::Error;
 						continue;
 					}

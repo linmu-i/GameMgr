@@ -23,10 +23,16 @@ namespace data
 
 	bool WriteFileData(std::span<const uint8_t> pkg, std::ofstream& f)
 	{
-		if (GetDataType(pkg) != DataType::FileData) return false;
+		if (GetDataType(pkg) != DataType::FileData)
+		{
+			return false;
+		}
 		type::MemoryIS is{ pkg.subspan(4) };
 		FileInfo info;
-		if (!Deserialize(is, info)) return false;
+		if (!Deserialize(is, info))
+		{
+			return false;
+		}
 		return WriteFileData(info, pkg.subspan(static_cast<size_t>(4) + is.position()), f);
 	}
 

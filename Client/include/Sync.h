@@ -49,10 +49,13 @@ namespace core
 	private:
 		std::deque<std::pair<Command, CommandResult>> commandQueue;
 		std::unique_ptr<std::mutex> mutex = std::make_unique<std::mutex>();
+		std::atomic<bool>& isRunning;
 
 	public:
+		CommandManager(std::atomic<bool>& isRunning) : isRunning(isRunning) {}
 		std::optional<std::pair<Command, CommandResult>> getCmd();
 		CommandResult pushCmd(Command cmd);
+		void update();
 	};
 
 	void SyncMain(cfg::Config& config, SyncContext& context, CommandManager& cmdMgr);

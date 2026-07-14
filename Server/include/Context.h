@@ -66,8 +66,8 @@ namespace svr
 
 			if (cfg["Core"].has("TmpDir"))
 			{
-				auto dataDirStr = cfg["Core"].get("DataDir");
-				result.dataDir = reinterpret_cast<const char8_t*>(dataDirStr.c_str());
+				auto dataDirStr = cfg["Core"].get("TmpDir");
+				result.tmpDir = reinterpret_cast<const char8_t*>(dataDirStr.c_str());
 			}
 
 			if (cfg["Core"].has("Port"))
