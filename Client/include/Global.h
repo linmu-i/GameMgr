@@ -12,4 +12,6 @@ namespace global
 	std::atomic<bool>& SyncFlag();
 	core::CommandResult& SyncCmd();
 	std::pair<std::filesystem::path, bool>& StartGameFlag();
+
+	std::atomic<bool>& ServerInfoRebuildFlag();
 }

@@ -22,12 +22,12 @@ int main()
 	ebbglow::core::entity scId = world.getEntityManager()->getId();
 	ebbglow::core::entity panelId = world.getEntityManager()->getId();
 
-	ebbglow::ui::yui::TransformCom scTrans{ { {140, 60}, {0, 0}, 0.0f, 1.0f }, {} };
+	ebbglow::ui::yui::TransformCom scTrans{ { {360, 60}, {0, 0}, 0.0f, 1.0f }, {} };
 	ebbglow::ui::yui::ControlCom scControl{ {0, 0, 1000, 600}, true, true, {} };
 	ebbglow::ui::yui::ViewPortCom scView{ Rect{0, 0, 1000, 600}, {} };
 
 	ebbglow::ui::yui::TransformCom panelTrans{ { {0, 0}, {0, 0}, 0.0f, 1.0f }, {} };
-	ebbglow::ui::yui::ControlCom panelControl{ {0, 0, 1000, 600}, true, true, {} };
+	ebbglow::ui::yui::ControlCom panelControl{ {0, -10000, 1000, 20000}, true, true, {} };
 	ebbglow::ui::yui::ViewPortCom panelView{ std::nullopt, {} };
 
 	ebbglow::ui::yui::TransformAttachTo(panelTrans, scTrans, scId);
@@ -62,45 +62,21 @@ int main()
 		ui::yui::LayerCom{ &(*world.getUiLayer())[0] }
 	);
 
-	ui::yui::TransformCom loadingPanelTrans{ { {0, 0}, {0, 0}, 0.0f, 1.0f }, {} };
-	ui::yui::ControlCom loadingPanelControl{ {0, 0, 1280, 720}, true, true, {} };
-	
-	ui::yui::TransformCom loadingIconTrans{ { {400, 320}, {40, 40}, 0.0f, 1.0f }, {} };
-	ui::yui::ControlCom loadingIconControl{ {0, 0, 1280, 720}, true, true, {} };
-
-	ui::yui::TransformCom loadingTextTrans{ { {490, 320}, {40, 40}, 0.0f, 1.0f }, {} };
-	ui::yui::ControlCom loadingTextControl{ {0, 0, 1280, 720}, true, true, {} };
-
-	ebbglow::core::entity loadingPanelId = world.getEntityManager()->getId();
-	ebbglow::core::entity loadingIconId = world.getEntityManager()->getId();
-	ebbglow::core::entity loadingTextId = world.getEntityManager()->getId();
-
-
-	ui::yui::TransformAttachTo(loadingIconTrans, loadingPanelTrans, loadingPanelId);
-	ui::yui::ControlAttachTo(loadingIconControl, loadingPanelControl, loadingPanelId);
-	ui::yui::TransformAttachTo(loadingTextTrans, loadingPanelTrans, loadingPanelId);
-	ui::yui::ControlAttachTo(loadingTextControl, loadingPanelControl, loadingPanelId);
-
-	world.createUnit(loadingPanelId, loadingPanelTrans, loadingPanelControl);
-	world.createUnit(loadingIconId, loadingIconTrans, loadingIconControl, ui::yui::ImageBox{rsc::SharedTexture(std::filesystem::path{"img/Loading.png"})}, ui::yui::LayerCom{ &(*world.getUiLayer())[10] });
-
-	world.createUnit(loadingTextId, loadingTextTrans, loadingTextControl,
-		ui::yui::TextBox
-		{ "同步中...", 48.0f, 4.0f, utils::DynamicLoadFont(global::GetFontData(), "同步中.", 64), 0x263290ff}, ui::yui::LayerCom{&(*world.getUiLayer())[10]}
-	);
-
 	::core::SyncContext syncContext;
 	::core::CommandManager cmdMgr{ syncContext.isRunning };
 
-	gui::GUIMgr guiMgr(world, cfg, panelId, scId, loadingPanelId, loadingIconId, cmdMgr, syncContext);
+	ebbglow::utils::ThreadPool threadPool(4);
+
+	gui::GUIMgr guiMgr(world, cfg, panelId, scId, cmdMgr, syncContext, threadPool);
 	guiMgr.rebuild();
+	guiMgr.rebuildSvrInfo();
 
 	world.addSystem(std::move(guiMgr));
 
 	syncContext.isRunning = true;
 	syncContext.serverEndpoint = tideecho::NetEndpoint("127.0.0.1", 34184, tideecho::AddressFamily::IPv4);
 
-	ebbglow::utils::ThreadPool threadPool(4);
+	
 
 	threadPool.enqueue([&syncContext, &cfg, &cmdMgr]()
 	{
@@ -135,6 +111,12 @@ int main()
 				syncContext.table = cfg::RebuildTable(cfg);
 				global::SyncCmd() = cmdMgr.pushCmd(::core::Command::Sync);
 			}
+		}
+
+		if (global::ServerInfoRebuildFlag())
+		{
+			global::ServerInfoRebuildFlag() = false;
+			world.getSystem<gui::GUIMgr>()->rebuildSvrInfo();
 		}
 
 		cmdMgr.update();

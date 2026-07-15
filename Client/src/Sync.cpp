@@ -2,6 +2,7 @@
 
 #include <Log.h>
 #include <Sync.h>
+#include <Global.h>
 
 namespace core
 {
@@ -75,13 +76,15 @@ namespace core
 			context.errorMessage = u8"Client connection error.";
 		}
 
+		global::ServerInfoRebuildFlag() = true;
+
 		SyncState state = SyncState::Idle;
 
 		RecvContext recvContext;
 
 		std::optional<CommandResult> cmdResult;
 
-		while (context.isRunning && client.valid())
+		while (context.isRunning)
 		{
 			
 
@@ -216,6 +219,7 @@ namespace core
 				else if (dataType == data::DataType::FileData)
 				{
 					auto fileInfo = data::FileDataGetInfo(*pkgOpt);
+					mgrLog::PrintLog(mgrLog::LogLevel::Debug, "File piece received. Server: {}, File: {}, Piece: {}/{}", context.serverEndpoint.toString(), fileInfo.vDir.string(), fileInfo.index + 1, fileInfo.packageCount);
 					if (fileInfo.vDir.empty())
 					{
 						mgrLog::PrintLog(mgrLog::LogLevel::Error, "Failed to parse file info from server. Server: {}", context.serverEndpoint.toString());
@@ -223,7 +227,7 @@ namespace core
 						continue;
 					}
 
-					if (recvContext.receivedCount > 0&& recvContext.info.vDir != fileInfo.vDir)
+					if (recvContext.receivedCount > 0 && recvContext.info.vDir != fileInfo.vDir)
 					{
 						mgrLog::PrintLog(mgrLog::LogLevel::Error, "Received file piece for unexpected file. Server: {}, Expected: {}, Received: {}", context.serverEndpoint.toString(), recvContext.info.vDir.string(), fileInfo.vDir.string());
 						state = SyncState::Error;
@@ -364,6 +368,10 @@ namespace core
 			}
 
 		}
+
+		mgrLog::PrintLog(mgrLog::LogLevel::Info, "Sync thread exiting. Server: {}", context.serverEndpoint.toString());
+
+		global::ServerInfoRebuildFlag() = true;
 
 		context.isRunning = false;
 	}

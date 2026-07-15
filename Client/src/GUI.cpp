@@ -28,6 +28,10 @@ namespace gui
 			for (auto& [gameName, gameCfg] : cfg->gameConfigs)
 			{
 				using namespace ebbglow::ui::yui;
+
+				float itemHeight = 120.0f;
+				float itemSpacing = 5.0f;
+
 				ItemId newItem;
 				newItem.gameNameTextBoxId = world->getEntityManager()->getId();
 				newItem.gamePathTextBoxId = world->getEntityManager()->getId();
@@ -35,7 +39,7 @@ namespace gui
 				itemIds.push_back(newItem);
 				gameExes.push_back(gameCfg.gameExe);
 
-				TransformCom nameTrans{ Transform{{70, 160 * index + 30}, {0,0}, 0.0f, 1.0f }, {} };
+				TransformCom nameTrans{ Transform{{70, (itemHeight + itemSpacing) * index + 30}, {0,0}, 0.0f, 1.0f }, {} };
 				ControlCom textControl{ {0, 0, 0, 0}, true, true, {} };
 				ViewPortCom view{ std::nullopt, {} };
 
@@ -57,7 +61,7 @@ namespace gui
 					LayerCom{ &(*world->getUiLayer())[5] }
 				);
 
-				TransformCom pathTrans{ Transform{{70, 160 * index + 70}, {0,0}, 0.0f, 1.0f }, {} };
+				TransformCom pathTrans{ Transform{{70, (itemHeight + itemSpacing) * index + 70}, {0,0}, 0.0f, 1.0f }, {} };
 				TransformAttachTo(pathTrans, panelTrans, panelId);
 
 				world->createUnit(newItem.gamePathTextBoxId, pathTrans, textControl, view,
@@ -72,8 +76,8 @@ namespace gui
 					LayerCom{ &(*world->getUiLayer())[5] }
 				);
 
-				TransformCom buttonTrans{ Transform{{50, 160 * index + 20}, {0,0}, 0.0f, 1.0f }, {} };
-				ControlCom buttonControl{ {0, 0, 900, 120}, true, true, {} };
+				TransformCom buttonTrans{ Transform{{50, (itemHeight + itemSpacing) * index}, {0,0}, 0.0f, 1.0f }, {} };
+				ControlCom buttonControl{ {0, 0, 800, itemHeight}, true, true, {} };
 
 				TransformAttachTo(buttonTrans, panelTrans, panelId);
 				ControlAttachTo(buttonControl, panelControl, panelId);
@@ -83,10 +87,10 @@ namespace gui
 					ButtonLogic{},
 					FillButtonVisual
 					{
-						0xffffffaa,
-						0x66ccffff,
+						0xffffff88,
+						0x66ccff00,
 						0x000000ff,
-						ebbglow::utils::DynamicLoadFont(global::GetFontData(), "", 48.0f), 0.0f, 0.0f, ""
+						ebbglow::utils::DynamicLoadFont(global::GetFontData(), "", 48.0f), 0.0f, 0.0f, "", 0.0f, 0.0f
 					},
 					ButtonMessage{},
 					LayerCom{ &(*world->getUiLayer())[4] }
@@ -95,51 +99,129 @@ namespace gui
 				++index;
 			}
 			auto& scrollContainer = *world->getDoubleBuffer<ebbglow::ui::yui::ScrollContainer>()->inactive()->get(scId);
-			scrollContainer.minOffset = std::min(0.0f,  600.0f - 160 * static_cast<float>(itemIds.size()));
+			scrollContainer.minOffset = std::min(0.0f,  605.0f - 125 * static_cast<float>(itemIds.size()));
 			scrollContainer.maxOffset = 0.0f;
 			scrollContainer.offset = 0.0f;
-		}
-
-		{
-			auto& iconTrans = *transPool->inactive()->get(loadingIconId);
-			iconTrans.transform.rotation += ebbglow::utils::GetFrameTime() * 6.0f;
-			iconTrans.transform.rotation = std::fmod(iconTrans.transform.rotation, std::numbers::pi_v<float> * 2.0f);
 		}
 
 		for (int i = 0; i < itemIds.size(); ++i)
 		{
 			auto& item = itemIds[i];
 			auto msgList = world->getMessageManager()->getMessageList(item.startButtonId);
-			if (msgList->empty()) continue;
+			if (!msgList) continue;
+			std::error_code ec;
+			if (!std::filesystem::is_regular_file(gameExes[i], ec)) continue;
+			for (auto* msg : *msgList)
+			{
+				if (msg->getType() == buttonReleaseMsgType)
+				{
+					global::SyncFlag() = true;
+					global::StartGameFlag() = { gameExes[i], true };
+					syncCtxt->table = cfg::RebuildTable(*cfg);
+					auto cmdRs = cmdMgr->pushCmd(::core::Command::Sync);
+					global::SyncCmd() = std::move(cmdRs);
+				}
+			}
 			
-			global::SyncFlag() = true;
-			global::StartGameFlag() = { gameExes[i], true };
-			syncCtxt->table = cfg::RebuildTable(*cfg);
-			auto cmdRs = cmdMgr->pushCmd(::core::Command::Sync);
-			global::SyncCmd() = std::move(cmdRs);
-			int l = 1;
+		}
+
+		if (rebuildSvrInfoFlag)
+		{
+			rebuildSvrInfoFlag = false;
+			for (auto& id : svrInfoIds)
+			{
+				world->deleteUnit(id);
+				world->getEntityManager()->recycleId(id);
+			}
+			svrInfoIds.clear();
+			reconnectBtnId = ebbglow::core::InvalidEntity;
+
+			using namespace ebbglow;
+
+			ebbglow::core::entity svrInfoTitleId = world->getEntityManager()->getId();
+			svrInfoIds.push_back(svrInfoTitleId);
+			ui::yui::TransformCom titleTrans{ ui::yui::Transform{{100, 100}, {0,0}, 0.0f, 1.0f }, {} };
+			world->createUnit(svrInfoTitleId, titleTrans,
+				ui::yui::TextBox
+				{
+					.text = "服务器信息: ",
+					.textSize = 48.0f,
+					.spacing = 3.0f,
+					.font = utils::DynamicLoadFont(global::GetFontData(), "服务器信息: ", 48.0f),
+					.textColor = 0x263290ff
+				},
+				ui::yui::LayerCom{ &(*world->getUiLayer())[5] }
+			);
+
+			ebbglow::core::entity svrIpId = world->getEntityManager()->getId();
+			svrInfoIds.push_back(svrIpId);
+			ui::yui::TransformCom ipTrans{ ui::yui::Transform{{100, 150}, {0,0}, 0.0f, 1.0f }, {} };
+			std::string ipText = "IP: " + syncCtxt->serverEndpoint.toString();
+			world->createUnit(svrIpId, ipTrans,
+				ui::yui::TextBox
+				{
+					.text = ipText,
+					.textSize = 36.0f,
+					.spacing = 3.0f,
+					.font = utils::DynamicLoadFont(global::GetFontData(), ipText, 36.0f),
+					.textColor = 0x263290ff
+				},
+				ui::yui::LayerCom{ &(*world->getUiLayer())[5] }
+			);
+
+			ebbglow::core::entity svrStatusId = world->getEntityManager()->getId();
+			svrInfoIds.push_back(svrStatusId);
+			ui::yui::TransformCom statusTrans{ ui::yui::Transform{{100, 200}, {0,0}, 0.0f, 1.0f }, {} };
+			std::string statusText = syncCtxt->isRunning ? "- 同步线程运行中" : "- 同步线程已停止";
+			world->createUnit(svrStatusId, statusTrans,
+				ui::yui::TextBox
+				{
+					.text = statusText,
+					.textSize = 36.0f,
+					.spacing = 3.0f,
+					.font = utils::DynamicLoadFont(global::GetFontData(), statusText, 36.0f),
+					.textColor = 0x263290ff
+				},
+				ui::yui::LayerCom{ &(*world->getUiLayer())[5] }
+			);
+
+			if (!syncCtxt->isRunning)
+			{
+				ebbglow::core::entity svrStartBtnId = world->getEntityManager()->getId();
+				svrInfoIds.push_back(svrStartBtnId);
+				world->getMessageManager()->subscribe(svrStartBtnId);
+				reconnectBtnId = svrStartBtnId;
+				ui::yui::TransformCom startBtnTrans{ ui::yui::Transform{{70, 250}, {0,0}, 0.0f, 1.0f }, {} };
+				ui::yui::ControlCom startBtnControl{ {0, 0, 310, 50}, true, true, {} };
+				world->createUnit(svrStartBtnId, startBtnTrans, startBtnControl,
+					ui::yui::ButtonLogic{},
+					ui::yui::FillButtonVisual
+					{
+						.fillColor = 0xffffff88,
+						.borderColor = 0x66ccff00,
+						.textColor = 0x263290ff,
+						.font = ebbglow::utils::DynamicLoadFont(global::GetFontData(), "启动同步线程", 36.0f),
+						.fontSize = 36.0f,
+						.spacing = 1.0f,
+						.text = "启动同步线程",
+						.roundness = 0.0f,
+					},
+					ui::yui::ButtonMessage{},
+					ui::yui::LayerCom{ &(*world->getUiLayer())[5] }
+				);
+			}
 		}
 
 		auto& inaPanelControl = *controlPool->inactive()->get(panelId);
-		auto& inaLoadingPanelControl = *controlPool->inactive()->get(loadingPanelId);
+
 
 		if (global::SyncFlag())
 		{
 			inaPanelControl.isActive = false;
-			inaPanelControl.isVisible = false;
-			inaLoadingPanelControl.isActive = true;
-			inaLoadingPanelControl.isVisible = true;
-			boardInterpolation += ebbglow::utils::GetFrameTime() * 10.0f;
-			boardInterpolation = std::clamp(boardInterpolation, 0.0f, 0.6f);
 		}
 		else
 		{
 			inaPanelControl.isActive = true;
-			inaPanelControl.isVisible = true;
-			inaLoadingPanelControl.isActive = false;
-			inaLoadingPanelControl.isVisible = false;
-			boardInterpolation -= ebbglow::utils::GetFrameTime() * 10.0f;
-			boardInterpolation = std::clamp(boardInterpolation, 0.0f, 0.6f);
 		}
 
 		if (global::SyncFlag() && (global::SyncCmd().success() || global::SyncCmd().error()))
@@ -147,6 +229,31 @@ namespace gui
 			global::SyncFlag() = false;
 		}
 
+		auto* reconnectBtnMsgList = world->getMessageManager()->getMessageList(reconnectBtnId);
+		if (reconnectBtnMsgList && !syncCtxt->isRunning)
+		{
+			for (auto* msg : *reconnectBtnMsgList)
+			{
+				if (msg->getType() == buttonReleaseMsgType)
+				{
+					syncCtxt->isRunning = true;
+					thrPool->enqueue([this]() {::core::SyncMain(*cfg, *syncCtxt, *cmdMgr); });
+				}
+			}
+		}
+
+
+		auto trans = ebbglow::ui::yui::GetFinalTransform(ebbglow::ui::yui::GetTransforms(*world, scId));
+		(*world->getUiLayer())[2].push_back(std::make_unique<DrawRectDraw>(std::nullopt, ebbglow::Rect{ trans.position + ebbglow::Vec2{40, -10}, ebbglow::Vec2{820, 620} }, panelTrans.transform, 0xffffff70));
+		(*world->getUiLayer())[2].push_back(std::make_unique<DrawRectDraw>(std::nullopt, ebbglow::Rect{ trans.position + ebbglow::Vec2{-300, -10}, ebbglow::Vec2{330, 620} }, panelTrans.transform, 0xffffff70));
+
+		(*world->getUiLayer())[2].push_back(std::make_unique<DrawRectDraw>(std::nullopt, ebbglow::Rect{ trans.position + ebbglow::Vec2{-290, 0}, ebbglow::Vec2{310, syncCtxt->isRunning ? 240 : 180} }, panelTrans.transform, 0xffffff70));
+		
 		(*world->getUiLayer())[7].push_back(std::make_unique<BoardDraw>(boardInterpolation));
+	}
+
+	void DrawRectDraw::draw()
+	{
+		ebbglow::gfx::DrawRect(rect, color);
 	}
 }

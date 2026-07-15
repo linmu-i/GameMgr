@@ -1,5 +1,6 @@
 #include <EbbGlow/UI/YUI/YUI.h>
 #include <EbbGlow/Graphics/Graphics.h>
+#include <EbbGlow/UI/Button/ButtonMsg.h>
 
 #include <Config.h>
 
@@ -18,6 +19,25 @@ namespace gui
 		}
 	};
 
+	class DrawRectDraw : public ebbglow::core::DrawBase
+	{
+	private:
+		std::optional<ebbglow::Rect> vp;
+		ebbglow::Rect rect;
+		ebbglow::ui::yui::Transform trans;
+		ebbglow::Color color;
+
+	public:
+		DrawRectDraw(std::optional<ebbglow::Rect> vp, ebbglow::Rect rect, ebbglow::ui::yui::Transform trans, ebbglow::Color color) : vp(vp), rect(rect), trans(trans), color(color) {}
+		void draw() override;
+	};
+
+	struct ServerInfo
+	{
+		::core::SyncContext* syncCtxt;
+
+	};
+
 	class GUIMgr : public ebbglow::core::SystemBase
 	{
 	private:
@@ -27,9 +47,7 @@ namespace gui
 		ebbglow::core::entity scId;
 		ebbglow::core::entity panelId;
 
-		ebbglow::core::entity loadingPanelId;
-		ebbglow::core::entity loadingIconId;
-
+		ebbglow::core::entity reconnectBtnId;
 
 		struct ItemId
 		{
@@ -40,7 +58,10 @@ namespace gui
 		std::vector<ItemId> itemIds;
 		std::vector<std::filesystem::path> gameExes;
 
+		std::vector<ebbglow::core::entity> svrInfoIds;
+
 		bool rebuildFlag = false;
+		bool rebuildSvrInfoFlag = false;
 
 		ebbglow::core::DoubleComs<ebbglow::ui::yui::TransformCom>* transPool;
 		ebbglow::core::DoubleComs<ebbglow::ui::yui::ControlCom>* controlPool;
@@ -49,18 +70,24 @@ namespace gui
 		::core::CommandManager* cmdMgr;
 		::core::SyncContext* syncCtxt;
 
+		ebbglow::utils::ThreadPool* thrPool;
+
 		float boardInterpolation = 0.0f;
+
+		ebbglow::core::MessageTypeId buttonReleaseMsgType;
 
 	public:
 		GUIMgr(ebbglow::core::World2D& world, cfg::Config& cfg, ebbglow::core::entity panelId, ebbglow::core::entity scId,
-			ebbglow::core::entity loadingPanelId, ebbglow::core::entity loadingIconId, ::core::CommandManager& cmdMgr,
-			::core::SyncContext& syncCtxt) :
-			
-			world(&world), cfg(&cfg), panelId(panelId), scId(scId), loadingPanelId(loadingPanelId), loadingIconId(loadingIconId),
-			transPool(world.getDoubleBuffer<ebbglow::ui::yui::TransformCom>()), controlPool(world.getDoubleBuffer<ebbglow::ui::yui::ControlCom>()),
-			viewPortPool(world.getDoubleBuffer<ebbglow::ui::yui::ViewPortCom>()), cmdMgr(&cmdMgr), syncCtxt(&syncCtxt) {}
+			::core::CommandManager& cmdMgr, ::core::SyncContext& syncCtxt, ebbglow::utils::ThreadPool& thrPool) :
+			world(&world), cfg(&cfg), panelId(panelId), scId(scId),
+			transPool(world.getDoubleBuffer<ebbglow::ui::yui::TransformCom>()),
+			controlPool(world.getDoubleBuffer<ebbglow::ui::yui::ControlCom>()),
+			viewPortPool(world.getDoubleBuffer<ebbglow::ui::yui::ViewPortCom>()),
+			buttonReleaseMsgType(world.getMessageManager()->getMessageTypeManager().getId<ebbglow::ui::ButtonReleaseMsg>()),
+			cmdMgr(&cmdMgr), syncCtxt(&syncCtxt), thrPool(&thrPool) {}
 		void update() override;
 		void rebuild() { rebuildFlag = true; }
+		void rebuildSvrInfo() { rebuildSvrInfoFlag = true; }
 	};
 
 	

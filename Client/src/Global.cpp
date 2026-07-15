@@ -24,4 +24,10 @@ namespace global
 		static std::pair<std::filesystem::path, bool> startGameFlag{ {}, false };
 		return startGameFlag;
 	}
+
+	std::atomic<bool>& ServerInfoRebuildFlag()
+	{
+		static std::atomic<bool> rebuildFlag{ false };
+		return rebuildFlag;
+	}
 }

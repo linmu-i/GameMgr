@@ -122,6 +122,17 @@ namespace cfg
 
 		for (auto& game : config.gameConfigs)
 		{
+			std::error_code ec;
+			if (!std::filesystem::exists(game.second.gameExe, ec))
+			{
+				mgrLog::PrintLog(mgrLog::LogLevel::Warning, "Game executable does not exist. Game: {}, Path: {} EC: {}", game.first.string(), game.second.gameExe.string(), ec.message());
+				continue;
+			}
+			if (!std::filesystem::is_directory(game.second.saveDir, ec))
+			{
+				mgrLog::PrintLog(mgrLog::LogLevel::Warning, "Save directory is not a directory. Game: {}, Path: {} EC: {}", game.first.string(), game.second.saveDir.string(), ec.message());
+				continue;
+			}
 			auto saveDir = game.second.saveDir;
 			removeSaveDirs.erase(std::remove(removeSaveDirs.begin(), removeSaveDirs.end(), game.first), removeSaveDirs.end());
 			auto gameFiles = table.gameFiles(game.first);
