@@ -4,7 +4,11 @@ project(Client)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-add_executable(Client)
+add_executable(Client WIN32)
+
+if (MSVC)
+    target_link_options(Client PRIVATE /ENTRY:mainCRTStartup)
+endif()
 
 target_compile_options(Client PRIVATE 
     $<$<CXX_COMPILER_ID:MSVC>:/utf-8>

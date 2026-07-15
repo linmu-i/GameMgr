@@ -146,9 +146,9 @@ namespace gui
 				ui::yui::TextBox
 				{
 					.text = "服务器信息: ",
-					.textSize = 48.0f,
+					.textSize = 36.0f,
 					.spacing = 1.0f,
-					.font = utils::DynamicLoadFont(global::GetFontData(), "服务器信息: ", 48.0f),
+					.font = utils::DynamicLoadFont(global::GetFontData(), "服务器信息: ", 36.0f),
 					.textColor = 0x263290ff
 				},
 				ui::yui::LayerCom{ &(*world->getUiLayer())[5] }
@@ -162,9 +162,9 @@ namespace gui
 				ui::yui::TextBox
 				{
 					.text = ipText,
-					.textSize = 36.0f,
+					.textSize = 32.0f,
 					.spacing = 1.0f,
-					.font = utils::DynamicLoadFont(global::GetFontData(), ipText, 36.0f),
+					.font = utils::DynamicLoadFont(global::GetFontData(), ipText, 32.0f),
 					.textColor = 0x263290ff
 				},
 				ui::yui::LayerCom{ &(*world->getUiLayer())[5] }
@@ -178,9 +178,9 @@ namespace gui
 				ui::yui::TextBox
 				{
 					.text = statusText,
-					.textSize = 36.0f,
+					.textSize = 32.0f,
 					.spacing = 1.0f,
-					.font = utils::DynamicLoadFont(global::GetFontData(), statusText, 36.0f),
+					.font = utils::DynamicLoadFont(global::GetFontData(), statusText, 32.0f),
 					.textColor = 0x263290ff
 				},
 				ui::yui::LayerCom{ &(*world->getUiLayer())[5] }
@@ -201,8 +201,8 @@ namespace gui
 						.fillColor = 0xdddddd90,
 						.borderColor = 0x66ccff00,
 						.textColor = 0x263290ff,
-						.font = ebbglow::utils::DynamicLoadFont(global::GetFontData(), "启动同步线程", 36.0f),
-						.fontSize = 36.0f,
+						.font = ebbglow::utils::DynamicLoadFont(global::GetFontData(), "启动同步线程", 32.0f),
+						.fontSize = 32.0f,
 						.spacing = 1.0f,
 						.text = "启动同步线程",
 						.roundness = 0.0f,
@@ -262,9 +262,9 @@ namespace gui
 				ebbglow::ui::yui::TextBox
 				{
 					.text = "状态:",
-					.textSize = 36.0f,
+					.textSize = 32.0f,
 					.spacing = 1.0f,
-					.font = ebbglow::utils::DynamicLoadFont(global::GetFontData(), "状态:", 36.0f),
+					.font = ebbglow::utils::DynamicLoadFont(global::GetFontData(), "状态:", 32.0f),
 					.textColor = 0x263290ff
 				},
 				ebbglow::ui::yui::LayerCom{ &(*world->getUiLayer())[5] }
@@ -294,9 +294,9 @@ namespace gui
 				ebbglow::ui::yui::TextBox
 				{
 					.text = statusText,
-					.textSize = 36.0f,
+					.textSize = 32.0f,
 					.spacing = 1.0f,
-					.font = ebbglow::utils::DynamicLoadFont(global::GetFontData(), statusText, 36.0f),
+					.font = ebbglow::utils::DynamicLoadFont(global::GetFontData(), statusText, 32.0f),
 					.textColor = 0x263290ff
 				},
 				ebbglow::ui::yui::LayerCom{ &(*world->getUiLayer())[5] }
