@@ -25,6 +25,12 @@ namespace global
 		return startGameFlag;
 	}
 
+	std::string& WaitingGameName()
+	{
+		static std::string waitingGameName;
+		return waitingGameName;
+	}
+
 	std::atomic<bool>& ServerInfoRebuildFlag()
 	{
 		static std::atomic<bool> rebuildFlag{ false };

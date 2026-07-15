@@ -70,11 +70,14 @@ int main()
 	gui::GUIMgr guiMgr(world, cfg, panelId, scId, cmdMgr, syncContext, threadPool);
 	guiMgr.rebuild();
 	guiMgr.rebuildSvrInfo();
+	guiMgr.rebuildStatus(gui::StatusType::Idle, "");
 
 	world.addSystem(std::move(guiMgr));
 
 	syncContext.isRunning = true;
-	syncContext.serverEndpoint = tideecho::NetEndpoint("127.0.0.1", 34184, tideecho::AddressFamily::IPv4);
+	syncContext.serverEndpoint = cfg.serverEndpoint;
+
+	auto& guiMgrRef = *world.getSystem<gui::GUIMgr>();
 
 	
 
@@ -93,11 +96,13 @@ int main()
 			win32Handle = win32::Win32CreateProcess(global::StartGameFlag().first, "");
 			if (win32Handle.valid())
 			{
+				guiMgrRef.rebuildStatus(gui::StatusType::ProgramRunning, global::StartGameFlag().first.filename().string());
 				isProcessActive = true;
 			}
 			else
 			{
-				mgrLog::PrintLog(mgrLog::LogLevel::Error, "Failed to start game process: {}", global::StartGameFlag().first.string());
+				guiMgrRef.rebuildStatus(gui::StatusType::Idle, "");
+				mgrLog::PrintLog(mgrLog::LogLevel::Error, "Failed to start game process: {}", global::StartGameFlag().first.filename().string());
 			}
 			global::StartGameFlag().second = false;
 		}
@@ -108,6 +113,7 @@ int main()
 			{
 				isProcessActive = false;
 				global::SyncFlag() = true;
+				guiMgrRef.rebuildStatus(gui::StatusType::Idle, "");
 				syncContext.table = cfg::RebuildTable(cfg);
 				global::SyncCmd() = cmdMgr.pushCmd(::core::Command::Sync);
 			}

@@ -50,14 +50,17 @@ namespace cfg
 					mgrLog::PrintLog(mgrLog::LogLevel::Warning, "Invalid WinWidth or WinHeight value: {}x{}", winWidthStr, winHeightStr);
 				}
 			}
-			if (cfg["Core"].has("ServerIP") && cfg["Core"].has("ServerPort"))
+			if (cfg["Core"].has("ServerIP") && cfg["Core"].has("ServerPort") && cfg["Core"].has("AddrFamily"))
 			{
 				auto serverIPStr = cfg["Core"].get("ServerIP");
 				auto serverPortStr = cfg["Core"].get("ServerPort");
+				auto addrFamilyStr = cfg["Core"].get("AddrFamily");
+				auto it = addrFamilyStr.find("6");
+				tideecho::AddressFamily addrFamily = (it != std::string::npos) ? tideecho::AddressFamily::IPv6 : tideecho::AddressFamily::IPv4;
 				try
 				{
 					uint16_t port = static_cast<uint16_t>(std::stoul(serverPortStr));
-					result.serverEndpoint = tideecho::NetEndpoint{ serverIPStr, port, tideecho::AddressFamily::IPv4 };
+					result.serverEndpoint = tideecho::NetEndpoint{ serverIPStr, port, addrFamily };
 				}
 				catch (...)
 				{

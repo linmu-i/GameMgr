@@ -38,6 +38,14 @@ namespace gui
 
 	};
 
+	enum class StatusType
+	{
+		Idle,
+		Syncing,
+		ProgramRunning,
+		None
+	};
+
 	class GUIMgr : public ebbglow::core::SystemBase
 	{
 	private:
@@ -60,8 +68,14 @@ namespace gui
 
 		std::vector<ebbglow::core::entity> svrInfoIds;
 
+		std::vector<ebbglow::core::entity> statusIds;
+
 		bool rebuildFlag = false;
 		bool rebuildSvrInfoFlag = false;
+		StatusType rebuildStatusFlag = StatusType::None;
+		std::string programName;
+
+		bool programRunning = false;
 
 		ebbglow::core::DoubleComs<ebbglow::ui::yui::TransformCom>* transPool;
 		ebbglow::core::DoubleComs<ebbglow::ui::yui::ControlCom>* controlPool;
@@ -88,6 +102,7 @@ namespace gui
 		void update() override;
 		void rebuild() { rebuildFlag = true; }
 		void rebuildSvrInfo() { rebuildSvrInfoFlag = true; }
+		void rebuildStatus(StatusType status, std::string programName) { rebuildStatusFlag = status; this->programName = std::move(programName); }
 	};
 
 	

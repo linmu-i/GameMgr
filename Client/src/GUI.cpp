@@ -54,7 +54,7 @@ namespace gui
 					{
 						reinterpret_cast<const char*>(gameName.u8string().c_str()),
 						48.0f,
-						3.0f,
+						1.0f,
 						ebbglow::utils::DynamicLoadFont(global::GetFontData(), reinterpret_cast<const char*>(gameName.u8string().c_str()), 48.0f),
 						textColor
 					},
@@ -87,7 +87,7 @@ namespace gui
 					ButtonLogic{},
 					FillButtonVisual
 					{
-						0xffffff88,
+						0xdddddd90,
 						0x66ccff00,
 						0x000000ff,
 						ebbglow::utils::DynamicLoadFont(global::GetFontData(), "", 48.0f), 0.0f, 0.0f, "", 0.0f, 0.0f
@@ -118,6 +118,7 @@ namespace gui
 					global::SyncFlag() = true;
 					global::StartGameFlag() = { gameExes[i], true };
 					syncCtxt->table = cfg::RebuildTable(*cfg);
+					rebuildStatus(StatusType::Syncing, "");
 					auto cmdRs = cmdMgr->pushCmd(::core::Command::Sync);
 					global::SyncCmd() = std::move(cmdRs);
 				}
@@ -140,13 +141,13 @@ namespace gui
 
 			ebbglow::core::entity svrInfoTitleId = world->getEntityManager()->getId();
 			svrInfoIds.push_back(svrInfoTitleId);
-			ui::yui::TransformCom titleTrans{ ui::yui::Transform{{100, 100}, {0,0}, 0.0f, 1.0f }, {} };
+			ui::yui::TransformCom titleTrans{ ui::yui::Transform{{95, 70}, {0,0}, 0.0f, 1.0f }, {} };
 			world->createUnit(svrInfoTitleId, titleTrans,
 				ui::yui::TextBox
 				{
 					.text = "服务器信息: ",
 					.textSize = 48.0f,
-					.spacing = 3.0f,
+					.spacing = 1.0f,
 					.font = utils::DynamicLoadFont(global::GetFontData(), "服务器信息: ", 48.0f),
 					.textColor = 0x263290ff
 				},
@@ -155,14 +156,14 @@ namespace gui
 
 			ebbglow::core::entity svrIpId = world->getEntityManager()->getId();
 			svrInfoIds.push_back(svrIpId);
-			ui::yui::TransformCom ipTrans{ ui::yui::Transform{{100, 150}, {0,0}, 0.0f, 1.0f }, {} };
+			ui::yui::TransformCom ipTrans{ ui::yui::Transform{{95, 120}, {0,0}, 0.0f, 1.0f }, {} };
 			std::string ipText = "IP: " + syncCtxt->serverEndpoint.toString();
 			world->createUnit(svrIpId, ipTrans,
 				ui::yui::TextBox
 				{
 					.text = ipText,
 					.textSize = 36.0f,
-					.spacing = 3.0f,
+					.spacing = 1.0f,
 					.font = utils::DynamicLoadFont(global::GetFontData(), ipText, 36.0f),
 					.textColor = 0x263290ff
 				},
@@ -171,14 +172,14 @@ namespace gui
 
 			ebbglow::core::entity svrStatusId = world->getEntityManager()->getId();
 			svrInfoIds.push_back(svrStatusId);
-			ui::yui::TransformCom statusTrans{ ui::yui::Transform{{100, 200}, {0,0}, 0.0f, 1.0f }, {} };
+			ui::yui::TransformCom statusTrans{ ui::yui::Transform{{95, 170}, {0,0}, 0.0f, 1.0f }, {} };
 			std::string statusText = syncCtxt->isRunning ? "- 同步线程运行中" : "- 同步线程已停止";
 			world->createUnit(svrStatusId, statusTrans,
 				ui::yui::TextBox
 				{
 					.text = statusText,
 					.textSize = 36.0f,
-					.spacing = 3.0f,
+					.spacing = 1.0f,
 					.font = utils::DynamicLoadFont(global::GetFontData(), statusText, 36.0f),
 					.textColor = 0x263290ff
 				},
@@ -191,13 +192,13 @@ namespace gui
 				svrInfoIds.push_back(svrStartBtnId);
 				world->getMessageManager()->subscribe(svrStartBtnId);
 				reconnectBtnId = svrStartBtnId;
-				ui::yui::TransformCom startBtnTrans{ ui::yui::Transform{{70, 250}, {0,0}, 0.0f, 1.0f }, {} };
+				ui::yui::TransformCom startBtnTrans{ ui::yui::Transform{{65, 255}, {0,0}, 0.0f, 1.0f }, {} };
 				ui::yui::ControlCom startBtnControl{ {0, 0, 310, 50}, true, true, {} };
 				world->createUnit(svrStartBtnId, startBtnTrans, startBtnControl,
 					ui::yui::ButtonLogic{},
 					ui::yui::FillButtonVisual
 					{
-						.fillColor = 0xffffff88,
+						.fillColor = 0xdddddd90,
 						.borderColor = 0x66ccff00,
 						.textColor = 0x263290ff,
 						.font = ebbglow::utils::DynamicLoadFont(global::GetFontData(), "启动同步线程", 36.0f),
@@ -215,7 +216,7 @@ namespace gui
 		auto& inaPanelControl = *controlPool->inactive()->get(panelId);
 
 
-		if (global::SyncFlag())
+		if (global::SyncFlag() || programRunning)
 		{
 			inaPanelControl.isActive = false;
 		}
@@ -243,12 +244,75 @@ namespace gui
 		}
 
 
-		auto trans = ebbglow::ui::yui::GetFinalTransform(ebbglow::ui::yui::GetTransforms(*world, scId));
-		(*world->getUiLayer())[2].push_back(std::make_unique<DrawRectDraw>(std::nullopt, ebbglow::Rect{ trans.position + ebbglow::Vec2{40, -10}, ebbglow::Vec2{820, 620} }, panelTrans.transform, 0xffffff70));
-		(*world->getUiLayer())[2].push_back(std::make_unique<DrawRectDraw>(std::nullopt, ebbglow::Rect{ trans.position + ebbglow::Vec2{-300, -10}, ebbglow::Vec2{330, 620} }, panelTrans.transform, 0xffffff70));
+		if (rebuildStatusFlag != StatusType::None)
+		{
+			
 
-		(*world->getUiLayer())[2].push_back(std::make_unique<DrawRectDraw>(std::nullopt, ebbglow::Rect{ trans.position + ebbglow::Vec2{-290, 0}, ebbglow::Vec2{310, syncCtxt->isRunning ? 240 : 180} }, panelTrans.transform, 0xffffff70));
-		
+			for (auto& id : statusIds)
+			{
+				world->deleteUnit(id);
+				world->getEntityManager()->recycleId(id);
+			}
+			statusIds.clear();
+
+			ebbglow::core::entity statusTitleId = world->getEntityManager()->getId();
+			statusIds.push_back(statusTitleId);
+			ebbglow::ui::yui::TransformCom titleTrans{ ebbglow::ui::yui::Transform{{95, 340}, {0,0}, 0.0f, 1.0f}, {} };
+			world->createUnit(statusTitleId, titleTrans,
+				ebbglow::ui::yui::TextBox
+				{
+					.text = "状态:",
+					.textSize = 36.0f,
+					.spacing = 1.0f,
+					.font = ebbglow::utils::DynamicLoadFont(global::GetFontData(), "状态:", 36.0f),
+					.textColor = 0x263290ff
+				},
+				ebbglow::ui::yui::LayerCom{ &(*world->getUiLayer())[5] }
+			);
+
+			ebbglow::core::entity statusTextId = world->getEntityManager()->getId();
+			statusIds.push_back(statusTextId);
+			ebbglow::ui::yui::TransformCom statusTrans{ ebbglow::ui::yui::Transform{{95, 380}, {0,0}, 0.0f, 1.0f}, {} };
+
+			std::string statusText;
+			if (rebuildStatusFlag == StatusType::Idle)
+			{
+				programRunning = false;
+				statusText = "- 空闲";
+			}
+			else if (rebuildStatusFlag == StatusType::Syncing)
+			{
+				statusText = "- 同步中";
+			}
+			else if (rebuildStatusFlag == StatusType::ProgramRunning)
+			{
+				programRunning = true;
+				statusText = "- 运行中: " + programName;
+			}
+
+			world->createUnit(statusTextId, statusTrans,
+				ebbglow::ui::yui::TextBox
+				{
+					.text = statusText,
+					.textSize = 36.0f,
+					.spacing = 1.0f,
+					.font = ebbglow::utils::DynamicLoadFont(global::GetFontData(), statusText, 36.0f),
+					.textColor = 0x263290ff
+				},
+				ebbglow::ui::yui::LayerCom{ &(*world->getUiLayer())[5] }
+			);
+
+			rebuildStatusFlag = StatusType::None;
+		}
+
+
+		auto trans = ebbglow::ui::yui::GetFinalTransform(ebbglow::ui::yui::GetTransforms(*world, scId));
+		(*world->getUiLayer())[2].push_back(std::make_unique<DrawRectDraw>(std::nullopt, ebbglow::Rect{ trans.position + ebbglow::Vec2{40, -10}, ebbglow::Vec2{820, 620} }, panelTrans.transform, 0xffffff50));
+		(*world->getUiLayer())[2].push_back(std::make_unique<DrawRectDraw>(std::nullopt, ebbglow::Rect{ trans.position + ebbglow::Vec2{-305, -10}, ebbglow::Vec2{330, 620} }, panelTrans.transform, 0xffffff50));
+
+		(*world->getUiLayer())[2].push_back(std::make_unique<DrawRectDraw>(std::nullopt, ebbglow::Rect{ trans.position + ebbglow::Vec2{-295, 0}, ebbglow::Vec2{310, syncCtxt->isRunning ? 240 : 180} }, panelTrans.transform, 0xdddddd90));
+		(*world->getUiLayer())[2].push_back(std::make_unique<DrawRectDraw>(std::nullopt, ebbglow::Rect{ trans.position + ebbglow::Vec2{-295, 260}, ebbglow::Vec2{310, 150} }, panelTrans.transform, 0xdddddd90));
+
 		(*world->getUiLayer())[7].push_back(std::make_unique<BoardDraw>(boardInterpolation));
 	}
 
