@@ -69,7 +69,7 @@ namespace gui
 					{
 						reinterpret_cast<const char*>(gameCfg.gameExe.u8string().c_str()),
 						24.0f,
-						3.0f,
+						1.0f,
 						ebbglow::utils::DynamicLoadFont(global::GetFontData(), reinterpret_cast<const char*>(gameCfg.gameExe.u8string().c_str()), 36.0f),
 						textColor
 					},
