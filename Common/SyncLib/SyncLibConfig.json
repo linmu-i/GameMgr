@@ -18,7 +18,8 @@
       "whitelist": [
         "TideEcho/src",
         "TideEcho/include",
-        "TideEcho/CMakeLists.txt"
+        "TideEcho/CMakeLists.txt",
+        "LICENSE.txt"
       ],
       "blacklist": []
     }
