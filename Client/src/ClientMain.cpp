@@ -30,9 +30,9 @@ int main()
 	ebbglow::ui::yui::ControlCom panelControl{ {0, -10000, 1000, 20000}, true, true, {} };
 	ebbglow::ui::yui::ViewPortCom panelView{ std::nullopt, {} };
 
-	ebbglow::ui::yui::TransformAttachTo(panelTrans, scTrans, scId);
-	ebbglow::ui::yui::ControlAttachTo(panelControl, scControl, scId);
-	ebbglow::ui::yui::ViewPortAttachTo(panelView, scView, scId);
+	ebbglow::ui::yui::TransformAttachTo(panelTrans, scId);
+	ebbglow::ui::yui::ControlAttachTo(panelControl, scId);
+	ebbglow::ui::yui::ViewPortAttachTo(panelView, scId);
 
 	world.createUnit(scId, scTrans, scControl, scView,
 		ebbglow::ui::yui::ScrollContainer

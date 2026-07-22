@@ -43,9 +43,9 @@ namespace gui
 				ControlCom textControl{ {0, 0, 0, 0}, true, true, {} };
 				ViewPortCom view{ std::nullopt, {} };
 
-				TransformAttachTo(nameTrans, panelTrans, panelId);
-				ControlAttachTo(textControl, panelControl, panelId);
-				ViewPortAttachTo(view, panelView, panelId);
+				TransformAttachTo(nameTrans, panelId);
+				ControlAttachTo(textControl, panelId);
+				ViewPortAttachTo(view, panelId);
 
 				ebbglow::Color textColor = 0x263290ff;
 
@@ -62,7 +62,7 @@ namespace gui
 				);
 
 				TransformCom pathTrans{ Transform{{70, (itemHeight + itemSpacing) * index + 70}, {0,0}, 0.0f, 1.0f }, {} };
-				TransformAttachTo(pathTrans, panelTrans, panelId);
+				TransformAttachTo(pathTrans, panelId);
 
 				world->createUnit(newItem.gamePathTextBoxId, pathTrans, textControl, view,
 					TextBox
@@ -79,8 +79,8 @@ namespace gui
 				TransformCom buttonTrans{ Transform{{50, (itemHeight + itemSpacing) * index}, {0,0}, 0.0f, 1.0f }, {} };
 				ControlCom buttonControl{ {0, 0, 800, itemHeight}, true, true, {} };
 
-				TransformAttachTo(buttonTrans, panelTrans, panelId);
-				ControlAttachTo(buttonControl, panelControl, panelId);
+				TransformAttachTo(buttonTrans, panelId);
+				ControlAttachTo(buttonControl, panelId);
 
 				world->getMessageManager()->subscribe(newItem.startButtonId);
 				world->createUnit(newItem.startButtonId, buttonTrans, buttonControl, view,
